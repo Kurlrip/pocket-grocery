@@ -42,6 +42,7 @@
     <canvas id="gameCanvas" width="900" height="700"></canvas>
 </div>
 
+<script src="isometric.js"></script>
 <script>
     // 1. CHARGEMENT DE LA SPRITESHEET DU DÉPÔT
     const spriteSheet = new Image();
@@ -98,10 +99,7 @@
     });
 
     function iso(x, y) {
-        return {
-            x: (x - y) * (tileSize / 2) + canvas.width / 2,
-            y: (x + y) * (tileSize / 4) + canvas.height / 6
-        };
+        return Isometric.project(x, y, tileSize, { x: canvas.width / 2, y: canvas.height / 6 });
     }
 
     function drawIsoTile(x, y, color, strokeColor = "#1e293b") {
@@ -282,24 +280,15 @@
 
     canvas.addEventListener('mousedown', (e) => {
         const rect = canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        const halfTile = tileSize / 2;
-        const quarterTile = tileSize / 4;
-        const recenteredX = mouseX - canvas.width / 2;
-        const recenteredY = mouseY - canvas.height / 6;
-
-        let gx = Math.round((recenteredX / halfTile + recenteredY / quarterTile) / 2);
-        let gy = Math.round((recenteredY / quarterTile - recenteredX / halfTile) / 2);
+        if (e.button !== 0) return;
+        const mouseX = (e.clientX - rect.left) * canvas.width / rect.width;
+        const mouseY = (e.clientY - rect.top) * canvas.height / rect.height;
+        const { x: gx, y: gy } = Isometric.pick(mouseX, mouseY, tileSize,
+            { x: canvas.width / 2, y: canvas.height / 6 });
 
         const config = GAME_CONFIG.departments[selectedDeptKey];
-        if (playerMoney >= config.cost && gx >= 0 && gx + config.size.w <= gridWidth && gy >= 0 && gy + config.size.h <= gridHeight) {
-            for (let iy = 0; iy < config.size.h; iy++) {
-                for (let ix = 0; ix < config.size.w; ix++) {
-                    if (gridData[gy + iy][gx + ix] !== 0) return;
-                }
-            }
+        if (playerMoney >= config.cost && Isometric.canPlace(gridData, gx, gy, config.size,
+            [ENTRANCE, CHECKOUT, STOCK_ROOM])) {
 
             playerMoney -= config.cost;
             const newBuilding = { x: gx, y: gy, type: selectedDeptKey, currentStock: config.capacity, beingRefilled: false };
@@ -331,12 +320,15 @@
         // Caisse Enregistreuse
         drawIsoTile(CHECKOUT.x, CHECKOUT.y, "#16a34a", "#15803d");
 
-        // Rayons
-        placedBuildings.forEach(b => drawBuilding(b));
-
-        // PNJ
-        staffMembers.forEach(s => drawAgent(s));
-        customers.forEach(c => drawAgent(c));
+        // Ordre commun arrière -> avant pour les rayons et les personnages.
+        const drawables = [
+            ...placedBuildings.map(b => {
+                const size = GAME_CONFIG.departments[b.type].size;
+                return { depth: b.x + b.y + (size.w + size.h) / 2, draw: () => drawBuilding(b) };
+            }),
+            ...staffMembers.concat(customers).map(a => ({ depth: a.x + a.y, draw: () => drawAgent(a) }))
+        ];
+        drawables.sort((a, b) => a.depth - b.depth).forEach(item => item.draw());
 
         requestAnimationFrame(gameLoop);
     }

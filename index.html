@@ -3,320 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pocket Grocery - Diorama Hypermarket Tycoon</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <title>Pocket Grocery - Hypermarché Diorama</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-        
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            user-select: none;
-            overflow: hidden;
-        }
-
-        canvas {
-            display: block;
-            touch-action: none;
-            cursor: pointer;
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.6);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
-
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .active-dept {
-            border-color: #3b82f6 !important;
-            background: rgba(59, 130, 246, 0.15) !important;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
-        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; background-color: #1a1a2e; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; display: flex; height: 100vh; }
+        #sidebar { width: 320px; background: #16213e; border-right: 2px solid #0f3460; padding: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
+        h2 { margin: 0 0 5px 0; color: #e94560; font-size: 1.3rem; }
+        .stat-box { background: #0f3460; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 1.1rem; display: flex; justify-content: space-between; }
+        .dept-btn { background: #0f3460; color: #fff; border: 1px solid #e94560; padding: 10px; border-radius: 6px; cursor: pointer; text-align: left; transition: all 0.2s; }
+        .dept-btn:hover { background: #e94560; }
+        .dept-btn.active { background: #e94560; font-weight: bold; border-color: #fff; }
+        .dept-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #555; }
+        #gameContainer { flex-grow: 1; position: relative; background: #0f172a; display: flex; justify-content: center; align-items: center; }
+        canvas { border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); background-color: #0f172a; }
+        .info-panel { background: rgba(22, 33, 62, 0.9); border: 1px solid #0f3460; padding: 10px; border-radius: 6px; font-size: 0.85rem; line-height: 1.4; }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col md:flex-row overflow-hidden bg-slate-950">
+<body>
 
-    <!-- SIDEBAR / CONTROL PANEL -->
-    <aside class="w-full md:w-96 glass-panel border-r border-slate-800 flex flex-col z-20 shrink-0 h-1/2 md:h-full">
-        <!-- HEADER -->
-        <div class="p-5 border-b border-slate-800/80 bg-slate-900/50 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-                    <i class="fa-solid fa-basket-shopping text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Pocket Grocery</h1>
-                    <p class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Hypermarché Diorama
-                    </p>
-                </div>
-            </div>
-            <button id="btnSound" class="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center justify-center">
-                <i class="fa-solid fa-volume-high text-sm"></i>
-            </button>
-        </div>
+<div id="sidebar">
+    <h2>Pocket Grocery</h2>
+    <div class="stat-box">
+        <span>Trésorerie :</span>
+        <span id="txtMoney">200 🪙</span>
+    </div>
+    
+    <div style="font-weight: bold; margin-top: 5px;">Placer un Rayon :</div>
+    <div id="deptList" style="display: flex; flex-direction: column; gap: 8px;"></div>
 
-        <!-- SPRITE SHEET INPUT SECTION -->
-        <div class="p-4 bg-slate-900/90 border-b border-slate-800 space-y-2">
-            <div class="flex items-center justify-between">
-                <label for="spriteUrlInput" class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <i class="fa-solid fa-image text-emerald-400"></i> Sprite Sheet Personnalisée
-                </label>
-                <span id="spriteStatusTag" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">Vectoriel</span>
-            </div>
-            <div class="flex gap-2">
-                <input id="spriteUrlInput" type="text" placeholder="Coller l'URL d'une image ou Base64 (data:image/png;base64,...)" class="flex-1 bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
-                <button id="btnLoadSprite" onclick="loadCustomSpriteSheet()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1 shrink-0">
-                    <i class="fa-solid fa-upload"></i> Charger
-                </button>
-            </div>
-        </div>
+    <div class="info-panel">
+        <b>État des Sprites :</b> <span id="spriteStatus" style="color: #f59e0b;">Chargement...</span><br>
+        • <b>Source :</b> <code>spritesheet.png</code> à la racine.<br>
+        • <b>Fallback :</b> Vectoriel auto si l'image est indisponible.
+    </div>
+</div>
 
-        <!-- ECONOMY DASHBOARD -->
-        <div class="p-4 bg-slate-900/80 border-b border-slate-800 grid grid-cols-2 gap-3">
-            <div class="bg-slate-800/70 p-3 rounded-xl border border-slate-700/50">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Trésorerie</div>
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-coins text-amber-400 text-lg"></i>
-                    <span id="txtMoney" class="text-xl font-extrabold text-amber-300">200 🪙</span>
-                </div>
-            </div>
-            <div class="bg-slate-800/70 p-3 rounded-xl border border-slate-700/50">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Fréquentation</div>
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-users text-blue-400 text-lg"></i>
-                    <span id="txtCustomers" class="text-xl font-extrabold text-blue-300">0/min</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- TABS NAVIGATION -->
-        <div class="flex border-b border-slate-800 bg-slate-900/40 text-xs font-bold uppercase tracking-wider">
-            <button id="tabDeptsBtn" onclick="switchTab('depts')" class="flex-1 py-3 border-b-2 border-blue-500 text-blue-400 transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-store"></i> Rayons
-            </button>
-            <button id="tabUpgradesBtn" onclick="switchTab('upgrades')" class="flex-1 py-3 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition flex items-center justify-center gap-2">
-                <i class="fa-solid fa-bolt"></i> Améliorations
-            </button>
-        </div>
-
-        <!-- TAB CONTENT 1: DEPARTMENTS -->
-        <div id="tabDepts" class="flex-1 overflow-y-auto p-4 space-y-3">
-            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Choisir un département à placer :</div>
-            <div id="deptList" class="space-y-2.5">
-                <!-- Dynamic Content Loaded by JS -->
-            </div>
-        </div>
-
-        <!-- TAB CONTENT 2: UPGRADES -->
-        <div id="tabUpgrades" class="flex-1 overflow-y-auto p-4 space-y-3 hidden">
-            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Gestion & Automatisation :</div>
-            
-            <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-2">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200">Vitesse du Réassorteur</div>
-                        <div class="text-xs text-slate-400">Le personnel bleu se déplace plus vite</div>
-                    </div>
-                    <span id="lvlSpeed" class="text-xs font-bold px-2 py-1 bg-slate-700 rounded text-slate-300">Niv 1</span>
-                </div>
-                <button id="btnUpgradeSpeed" onclick="buyUpgrade('speed')" class="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 font-bold text-slate-950 rounded-lg text-xs transition flex justify-between items-center">
-                    <span>Améliorer</span>
-                    <span id="costSpeed">150 🪙</span>
-                </button>
-            </div>
-
-            <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-2">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200">Capacité Réserve +50%</div>
-                        <div class="text-xs text-slate-400">Augmente le stockage max de tous les rayons</div>
-                    </div>
-                    <span id="lvlCap" class="text-xs font-bold px-2 py-1 bg-slate-700 rounded text-slate-300">Niv 1</span>
-                </div>
-                <button id="btnUpgradeCap" onclick="buyUpgrade('capacity')" class="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 font-bold text-slate-950 rounded-lg text-xs transition flex justify-between items-center">
-                    <span>Améliorer</span>
-                    <span id="costCap">300 🪙</span>
-                </button>
-            </div>
-
-            <div class="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/60 space-y-2">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <div class="font-bold text-sm text-slate-200">Embaucher 2ème Réassorteur</div>
-                        <div class="text-xs text-slate-400">Gère plusieurs ruptures de stock simultanées</div>
-                    </div>
-                    <span id="lvlStaff" class="text-xs font-bold px-2 py-1 bg-slate-700 rounded text-slate-300">1 Staff</span>
-                </div>
-                <button id="btnUpgradeStaff" onclick="buyUpgrade('staff')" class="w-full py-2 px-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 font-bold text-slate-950 rounded-lg text-xs transition flex justify-between items-center">
-                    <span>Recruter</span>
-                    <span id="costStaff">500 🪙</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- FOOTER INFO -->
-        <div class="p-3 border-t border-slate-800 bg-slate-900/90 text-xs text-slate-400 flex justify-between items-center">
-            <span><i class="fa-solid fa-hand-pointer text-blue-400 mr-1"></i> Cliquez sur la grille pour placer</span>
-            <span class="text-emerald-400 font-mono font-bold">100% Autonome</span>
-        </div>
-    </aside>
-
-    <!-- MAIN GAME CANVAS CONTAINER -->
-    <main class="flex-1 relative bg-slate-950 overflow-hidden flex items-center justify-center h-1/2 md:h-full">
-        <!-- Floating HUD Overlay -->
-        <div class="absolute top-4 right-4 z-10 flex gap-2">
-            <div class="glass-panel px-3 py-1.5 rounded-xl border border-slate-700/50 text-xs font-bold text-slate-300 flex items-center gap-2 shadow-lg">
-                <i class="fa-solid fa-cash-register text-emerald-400"></i> Marc Caissier : <span class="text-emerald-300 font-extrabold">ACTIF</span>
-            </div>
-        </div>
-
-        <canvas id="gameCanvas"></canvas>
-    </main>
+<div id="gameContainer">
+    <canvas id="gameCanvas" width="900" height="700"></canvas>
+</div>
 
 <script>
+    // 1. CHARGEMENT DE LA SPRITESHEET DU DÉPÔT
+    const spriteSheet = new Image();
+    spriteSheet.src = 'spritesheet.png';
+
+    let useSprites = false;
+
+    spriteSheet.onload = () => {
+        useSprites = true;
+        document.getElementById('spriteStatus').innerText = "Actif (spritesheet.png)";
+        document.getElementById('spriteStatus').style.color = "#10b981";
+    };
+
+    spriteSheet.onerror = () => {
+        useSprites = false;
+        document.getElementById('spriteStatus').innerText = "Mode Vectoriel (Image non trouvée)";
+        document.getElementById('spriteStatus').style.color = "#ef4444";
+    };
+
+    // 2. CONFIGURATION ÉCONOMIQUE ET DÉCOUPE DES SPRITES
     const GAME_CONFIG = {
         departments: {
-            produce: {
-                id: "produce",
-                name: "Fruits & Légumes",
-                icon: "fa-apple-whole",
-                cost: 100,
-                capacity: 15,
-                incomePerSale: 8,
-                color: "#16a34a",
-                topColor: "#4ade80",
-                woodColor: "#b45309",
-                size: { w: 2, h: 1 },
-                description: "Pommes, bananes et légumes frais sur étagères en bois.",
-                spriteCrop: { x: 0, y: 0, w: 200, h: 200 }
-            },
-            dairy: {
-                id: "dairy",
-                name: "Frais & Laitiers",
-                icon: "fa-glass-water",
-                cost: 280,
-                capacity: 25,
-                incomePerSale: 18,
-                color: "#0288d1",
-                topColor: "#38bdf8",
-                glassColor: "#e0f2fe",
-                size: { w: 2, h: 1 },
-                description: "Vitrine réfrigérée verticale avec produits laitiers.",
-                spriteCrop: { x: 200, y: 0, w: 200, h: 200 }
-            },
-            grocery: {
-                id: "grocery",
-                name: "Épicerie Sèche",
-                icon: "fa-box-open",
-                cost: 650,
-                capacity: 40,
-                incomePerSale: 35,
-                color: "#d97706",
-                topColor: "#fbbf24",
-                boxColor: "#f59e0b",
-                size: { w: 2, h: 2 },
-                description: "Grand rayonnage double avec paquets et conserves.",
-                spriteCrop: { x: 400, y: 0, w: 200, h: 200 }
-            },
-            frozen: {
-                id: "frozen",
-                name: "Surgelés",
-                icon: "fa-snowflake",
-                cost: 1200,
-                capacity: 35,
-                incomePerSale: 60,
-                color: "#0891b2",
-                topColor: "#22d3ee",
-                frostColor: "#cffaff",
-                size: { w: 2, h: 1 },
-                description: "Bac congélateur horizontal vitré à haute valeur.",
-                spriteCrop: { x: 0, y: 200, w: 200, h: 200 }
-            },
-            non_food: {
-                id: "non_food",
-                name: "Non-Alimentaire",
-                icon: "fa-plug",
-                cost: 2500,
-                capacity: 30,
-                incomePerSale: 120,
-                color: "#7e22ce",
-                topColor: "#c084fc",
-                metalColor: "#94a3b8",
-                size: { w: 2, h: 2 },
-                description: "Présentoir électroménager et produits d'entretien.",
-                spriteCrop: { x: 200, y: 200, w: 200, h: 200 }
-            }
+            produce: { id: "produce", name: "Fruits & Légumes", cost: 100, capacity: 15, incomePerSale: 5, size: { w: 2, h: 1 }, color: "#4caf50", topColor: "#81c784", spriteRect: { x: 250, y: 350, w: 250, h: 180 } },
+            dairy:   { id: "dairy",   name: "Frais & Laitiers",  cost: 300, capacity: 25, incomePerSale: 12, size: { w: 2, h: 1 }, color: "#0288d1", topColor: "#4fc3f7", spriteRect: { x: 40, y: 350, w: 200, h: 180 } },
+            grocery: { id: "grocery", name: "Épicerie Sèche",   cost: 750, capacity: 40, incomePerSale: 25, size: { w: 2, h: 2 }, color: "#f57c00", topColor: "#ffb74d", spriteRect: { x: 530, y: 350, w: 250, h: 210 } },
+            frozen:  { id: "frozen",  name: "Surgelés",         cost: 1500, capacity: 30, incomePerSale: 45, size: { w: 2, h: 1 }, color: "#0097a7", topColor: "#80deea", spriteRect: { x: 280, y: 560, w: 220, h: 180 } },
+            non_food:{ id: "non_food",name: "Non-Alimentaire",  cost: 3500, capacity: 20, incomePerSale: 90, size: { w: 2, h: 2 }, color: "#7b1fa2", topColor: "#ba68c8", spriteRect: { x: 530, y: 560, w: 250, h: 210 } }
         }
     };
 
     let playerMoney = 200;
     let selectedDeptKey = "produce";
-    let customerRate = 0;
-    let totalSalesCount = 0;
-
-    // Sprite Sheet Management
-    let customSpriteImg = new Image();
-    let isCustomSpriteLoaded = false;
-
-    function loadCustomSpriteSheet() {
-        const urlInput = document.getElementById('spriteUrlInput').value.trim();
-        const tag = document.getElementById('spriteStatusTag');
-
-        if (!urlInput) {
-            isCustomSpriteLoaded = false;
-            tag.innerText = "Vectoriel";
-            tag.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700";
-            return;
-        }
-
-        tag.innerText = "Chargement...";
-        tag.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/50";
-
-        customSpriteImg = new Image();
-        customSpriteImg.crossOrigin = "anonymous";
-        customSpriteImg.src = urlInput;
-
-        customSpriteImg.onload = () => {
-            isCustomSpriteLoaded = true;
-            tag.innerText = "Sprite Actif";
-            tag.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-900/80 text-emerald-300 border border-emerald-600/50";
-            playSound('buy');
-        };
-
-        customSpriteImg.onerror = () => {
-            isCustomSpriteLoaded = false;
-            tag.innerText = "Erreur Image";
-            tag.className = "text-[10px] font-bold px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 border border-rose-600/50";
-        };
-    }
-
-    let upgrades = {
-        speed: { level: 1, cost: 150, value: 0.04 },
-        capacity: { level: 1, cost: 300, multiplier: 1.0 },
-        staff: { count: 1, cost: 500 }
-    };
-
+    
     const gridWidth = 12;
     const gridHeight = 12;
-    const tileSize = 52;
+    const tileSize = 56;
     let gridData = Array(gridHeight).fill().map(() => Array(gridWidth).fill(0));
     let placedBuildings = [];
 
@@ -330,65 +91,20 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let soundEnabled = true;
-
-    function playSound(type) {
-        if (!soundEnabled || !audioCtx) return;
-        try {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            if (type === 'coin') {
-                osc.frequency.setValueAtTime(987.77, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1318.51, audioCtx.currentTime + 0.15);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.15);
-            } else if (type === 'buy') {
-                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.2);
-            }
-        } catch(e) {}
-    }
-
-    document.getElementById('btnSound').addEventListener('click', () => {
-        soundEnabled = !soundEnabled;
-        document.getElementById('btnSound').classList.toggle('text-slate-500', !soundEnabled);
+    staffMembers.push({
+        x: STOCK_ROOM.x, y: STOCK_ROOM.y,
+        targetX: STOCK_ROOM.x, targetY: STOCK_ROOM.y,
+        state: "IDLE", targetBuilding: null, speed: 0.05, isStaff: true
     });
-
-    function initStaff() {
-        staffMembers = [];
-        for (let i = 0; i < upgrades.staff.count; i++) {
-            staffMembers.push({
-                id: i,
-                x: STOCK_ROOM.x,
-                y: STOCK_ROOM.y,
-                targetX: STOCK_ROOM.x,
-                targetY: STOCK_ROOM.y,
-                state: "IDLE",
-                targetBuilding: null,
-                color: "#2563eb",
-                speed: upgrades.speed.value
-            });
-        }
-    }
 
     function iso(x, y) {
         return {
             x: (x - y) * (tileSize / 2) + canvas.width / 2,
-            y: (x + y) * (tileSize / 4) + canvas.height / 5
+            y: (x + y) * (tileSize / 4) + canvas.height / 6
         };
     }
 
-    function drawIsoTile(x, y, color, strokeColor = "rgba(255,255,255,0.08)") {
+    function drawIsoTile(x, y, color, strokeColor = "#1e293b") {
         const p = iso(x, y);
         ctx.beginPath();
         ctx.moveTo(p.x, p.y);
@@ -399,212 +115,90 @@
         ctx.fillStyle = color;
         ctx.fill();
         ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1;
         ctx.stroke();
     }
 
-    function drawBuildingDiorama(b) {
+    // Dessin hybride : Sprite si chargé, 3D Isométrique vectorielle sinon
+    function drawBuilding(b) {
         const config = GAME_CONFIG.departments[b.type];
         const p = iso(b.x, b.y);
-        const maxCap = Math.round(config.capacity * upgrades.capacity.multiplier);
-        const stockRatio = b.currentStock / maxCap;
-        const h = 32;
 
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 12, tileSize * 0.9, tileSize * 0.45, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
-        ctx.fill();
-
-        // Check if custom sprite is ready to render
-        if (isCustomSpriteLoaded && customSpriteImg.complete && customSpriteImg.naturalWidth > 0) {
-            const crop = config.spriteCrop;
-            const drawWidth = tileSize * config.size.w * 1.2;
-            const drawHeight = drawWidth * (crop.h / crop.w);
-            
-            ctx.drawImage(
-                customSpriteImg,
-                crop.x, crop.y, crop.w, crop.h,
-                p.x - drawWidth / 2, p.y - drawHeight + 10,
-                drawWidth, drawHeight
-            );
+        if (useSprites) {
+            const s = config.spriteRect;
+            ctx.drawImage(spriteSheet, s.x, s.y, s.w, s.h, p.x - 45, p.y - 50, 90, 80);
         } else {
-            // Procedural fallback renders
-            if (b.type === 'produce') {
-                drawIsoCube(p.x, p.y, config.size.w, config.size.h, 24, "#78350f", "#b45309", "#d97706");
-                if (b.currentStock > 0) {
-                    drawSpheres(p.x - 10, p.y - 18, "#ef4444", 3);
-                    drawSpheres(p.x + 8, p.y - 14, "#eab308", 4);
-                    drawSpheres(p.x - 2, p.y - 24, "#22c55e", 3);
-                }
-            } 
-            else if (b.type === 'dairy') {
-                drawIsoCube(p.x, p.y, config.size.w, config.size.h, 38, "#0288d1", "#0369a1", "#38bdf8");
-                ctx.fillStyle = "rgba(224, 242, 254, 0.65)";
-                ctx.fillRect(p.x - 18, p.y - 32, 36, 26);
-                ctx.strokeStyle = "#ffffff";
-                ctx.strokeRect(p.x - 18, p.y - 32, 36, 26);
-                if (b.currentStock > 0) {
-                    ctx.fillStyle = "#ffffff";
-                    ctx.fillRect(p.x - 12, p.y - 28, 6, 10);
-                    ctx.fillRect(p.x - 2, p.y - 28, 6, 10);
-                    ctx.fillStyle = "#f43f5e";
-                    ctx.fillRect(p.x + 8, p.y - 28, 6, 10);
-                }
-            }
-            else if (b.type === 'grocery') {
-                drawIsoCube(p.x, p.y, config.size.w, config.size.h, 34, "#d97706", "#b45309", "#fbbf24");
-                if (b.currentStock > 0) {
-                    drawBoxes(p.x - 14, p.y - 26, "#3b82f6");
-                    drawBoxes(p.x - 2, p.y - 30, "#ec4899");
-                    drawBoxes(p.x + 10, p.y - 24, "#10b981");
-                }
-            }
-            else if (b.type === 'frozen') {
-                drawIsoCube(p.x, p.y, config.size.w, config.size.h, 20, "#0891b2", "#0e7490", "#67e8f9");
-                ctx.fillStyle = "rgba(207, 250, 255, 0.8)";
-                ctx.beginPath();
-                ctx.ellipse(p.x, p.y - 18, 18, 9, 0, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.strokeStyle = "#ffffff";
-                ctx.stroke();
-            }
-            else if (b.type === 'non_food') {
-                drawIsoCube(p.x, p.y, config.size.w, config.size.h, 32, "#6b21a8", "#581c87", "#a855f7");
-                if (b.currentStock > 0) {
-                    ctx.fillStyle = "#0f172a";
-                    ctx.fillRect(p.x - 12, p.y - 28, 14, 10);
-                    ctx.fillStyle = "#38bdf8";
-                    ctx.fillRect(p.x - 10, p.y - 26, 10, 6);
-                }
-            }
-        }
-
-        const gaugeY = p.y - h - 18;
-        ctx.fillStyle = "rgba(15, 23, 42, 0.85)";
-        ctx.fillRect(p.x - 22, gaugeY, 44, 7);
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-        ctx.strokeRect(p.x - 22, gaugeY, 44, 7);
-
-        const fillColor = stockRatio > 0.3 ? "#22c55e" : (stockRatio > 0 ? "#f59e0b" : "#ef4444");
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(p.x - 21, gaugeY + 1, 42 * stockRatio, 5);
-
-        if (b.currentStock === 0 && !b.beingRefilled) {
-            ctx.fillStyle = "#ef4444";
-            ctx.font = "900 12px 'Font Awesome 6 Free'";
-            ctx.textAlign = "center";
-            ctx.fillText("\uf071", p.x, gaugeY - 4);
-        }
-    }
-
-    function drawIsoCube(x, y, sizeW, sizeH, height, colorLeft, colorRight, colorTop) {
-        const w = (tileSize * sizeW) / 2;
-        const h = (tileSize * sizeH) / 4;
-
-        ctx.beginPath();
-        ctx.moveTo(x, y - height);
-        ctx.lineTo(x + w, y - height + h / 2);
-        ctx.lineTo(x, y - height + h);
-        ctx.lineTo(x - w, y - height + h / 2);
-        ctx.closePath();
-        ctx.fillStyle = colorTop;
-        ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.15)";
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(x - w, y - height + h / 2);
-        ctx.lineTo(x, y - height + h);
-        ctx.lineTo(x, y + h);
-        ctx.lineTo(x - w, y + h / 2);
-        ctx.closePath();
-        ctx.fillStyle = colorLeft;
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(x, y - height + h);
-        ctx.lineTo(x + w, y - height + h / 2);
-        ctx.lineTo(x + w, y + h / 2);
-        ctx.lineTo(x, y + h);
-        ctx.closePath();
-        ctx.fillStyle = colorRight;
-        ctx.fill();
-        ctx.stroke();
-    }
-
-    function drawSpheres(x, y, color, count) {
-        ctx.fillStyle = color;
-        for (let i = 0; i < count; i++) {
+            const height = 30;
+            // Haut
             ctx.beginPath();
-            ctx.arc(x + i * 5, y + (i % 2) * 2, 3, 0, Math.PI * 2);
+            ctx.moveTo(p.x, p.y - height);
+            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4 - height);
+            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
+            ctx.lineTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4 - height);
+            ctx.closePath();
+            ctx.fillStyle = config.topColor;
             ctx.fill();
+            ctx.strokeStyle = "#1a1a1a";
+            ctx.stroke();
+
+            // Gauche
+            ctx.beginPath();
+            ctx.moveTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4 - height);
+            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
+            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4);
+            ctx.lineTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4);
+            ctx.closePath();
+            ctx.fillStyle = config.color;
+            ctx.fill();
+            ctx.stroke();
+
+            // Droite
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
+            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4 - height);
+            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4);
+            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4);
+            ctx.closePath();
+            ctx.fillStyle = config.color;
+            ctx.fill();
+            ctx.stroke();
         }
-    }
 
-    function drawBoxes(x, y, color) {
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y, 7, 10);
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(x, y, 7, 10);
-    }
+        // Texte
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(config.name, p.x, p.y - 42);
 
-    function drawCheckoutRegister() {
-        const p = iso(CHECKOUT.x, CHECKOUT.y);
-        drawIsoCube(p.x, p.y, 1.5, 1, 20, "#334155", "#1e293b", "#475569");
-        ctx.fillStyle = "#fbbf24";
-        ctx.fillRect(p.x - 6, p.y - 24, 12, 10);
-        ctx.fillStyle = "#0f172a";
-        ctx.fillRect(p.x - 4, p.y - 22, 8, 5);
-
-        ctx.fillStyle = "#16a34a";
-        ctx.beginPath();
-        ctx.arc(p.x + 8, p.y - 22, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(p.x + 4, p.y - 16, 8, 10);
+        // Jauge de stock
+        const stockPercent = b.currentStock / config.capacity;
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(p.x - 22, p.y - 38, 44, 6);
+        ctx.fillStyle = stockPercent > 0.25 ? "#4caf50" : "#f44336";
+        ctx.fillRect(p.x - 21, p.y - 37, 42 * stockPercent, 4);
     }
 
     function drawAgent(agent) {
         const p = iso(agent.x, agent.y);
+        
         ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 3, 7, 3.5, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+        ctx.ellipse(p.x, p.y + 2, 8, 4, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
         ctx.fill();
 
-        if (agent.isStaff) {
-            ctx.fillStyle = "#2563eb";
-            ctx.beginPath();
-            ctx.arc(p.x, p.y - 16, 5.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillRect(p.x - 4, p.y - 10, 8, 11);
-
-            if (agent.state === "MOVING_TO_REFILL" || agent.state === "REFILLING") {
-                ctx.fillStyle = "#b45309";
-                ctx.fillRect(p.x - 6, p.y - 12, 12, 7);
-            }
-        } else {
-            ctx.fillStyle = agent.shirtColor || "#e11d48";
-            ctx.beginPath();
-            ctx.arc(p.x, p.y - 16, 5.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillRect(p.x - 4, p.y - 10, 8, 11);
-
-            if (agent.hasItem) {
-                ctx.fillStyle = "#d97706";
-                ctx.fillRect(p.x + 4, p.y - 8, 5, 7);
-            }
-        }
+        ctx.fillStyle = agent.isStaff ? "#2563eb" : "#e11d48";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y - 16, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(p.x - 5, p.y - 10, 10, 12);
+        ctx.strokeStyle = "#000";
+        ctx.stroke();
     }
 
-    function updateSimulation() {
+    function updateAgents() {
         customers.forEach((c, index) => {
             c.x += (c.targetX - c.x) * c.speed;
             c.y += (c.targetY - c.y) * c.speed;
-
-            const dist = Math.hypot(c.targetX - c.x, c.targetY - c.y);
-
-            if (dist < 0.08) {
+            if (Math.hypot(c.targetX - c.x, c.targetY - c.y) < 0.1) {
                 if (c.state === "SHOPPING" && c.targetBuilding) {
                     if (c.targetBuilding.currentStock > 0) {
                         c.targetBuilding.currentStock--;
@@ -612,62 +206,42 @@
                         c.itemValue = GAME_CONFIG.departments[c.targetBuilding.type].incomePerSale;
                     }
                     c.state = "GOING_TO_CHECKOUT";
-                    c.targetX = CHECKOUT.x;
-                    c.targetY = CHECKOUT.y;
-                } 
-                else if (c.state === "GOING_TO_CHECKOUT") {
-                    if (c.hasItem) {
-                        playerMoney += c.itemValue;
-                        totalSalesCount++;
-                        playSound('coin');
-                        updateUI();
-                    }
+                    c.targetX = CHECKOUT.x; c.targetY = CHECKOUT.y;
+                } else if (c.state === "GOING_TO_CHECKOUT") {
+                    if (c.hasItem) { playerMoney += c.itemValue; updateUI(); }
                     c.state = "LEAVING";
-                    c.targetX = ENTRANCE.x;
-                    c.targetY = ENTRANCE.y;
-                } 
-                else if (c.state === "LEAVING") {
+                    c.targetX = ENTRANCE.x; c.targetY = ENTRANCE.y;
+                } else if (c.state === "LEAVING") {
                     customers.splice(index, 1);
                 }
             }
         });
 
         staffMembers.forEach(s => {
-            s.speed = upgrades.speed.value;
             s.x += (s.targetX - s.x) * s.speed;
             s.y += (s.targetY - s.y) * s.speed;
-
             const dist = Math.hypot(s.targetX - s.x, s.targetY - s.y);
 
             if (s.state === "IDLE") {
-                let depleted = placedBuildings.find(b => {
-                    const maxCap = Math.round(GAME_CONFIG.departments[b.type].capacity * upgrades.capacity.multiplier);
-                    return b.currentStock < maxCap * 0.5 && !b.beingRefilled;
-                });
-
-                if (depleted) {
-                    s.targetBuilding = depleted;
-                    depleted.beingRefilled = true;
-                    s.state = "MOVING_TO_REFILL";
-                    s.targetX = depleted.x;
-                    s.targetY = depleted.y;
+                let emptyBuilding = placedBuildings.find(b => b.currentStock < GAME_CONFIG.departments[b.type].capacity / 2 && !b.beingRefilled);
+                if (emptyBuilding) {
+                    s.targetBuilding = emptyBuilding;
+                    emptyBuilding.beingRefilled = true;
+                    s.state = "MOVING_TO_REFALL";
+                    s.targetX = emptyBuilding.x; s.targetY = emptyBuilding.y;
                 }
-            } 
-            else if (dist < 0.1) {
-                if (s.state === "MOVING_TO_REFILL") {
+            } else if (dist < 0.1) {
+                if (s.state === "MOVING_TO_REFALL") {
                     s.state = "REFILLING";
                     setTimeout(() => {
                         if (s.targetBuilding) {
-                            const maxCap = Math.round(GAME_CONFIG.departments[s.targetBuilding.type].capacity * upgrades.capacity.multiplier);
-                            s.targetBuilding.currentStock = maxCap;
+                            s.targetBuilding.currentStock = GAME_CONFIG.departments[s.targetBuilding.type].capacity;
                             s.targetBuilding.beingRefilled = false;
                         }
                         s.state = "RETURNING";
-                        s.targetX = STOCK_ROOM.x;
-                        s.targetY = STOCK_ROOM.y;
-                    }, 1200);
-                } 
-                else if (s.state === "RETURNING") {
+                        s.targetX = STOCK_ROOM.x; s.targetY = STOCK_ROOM.y;
+                    }, 1500);
+                } else if (s.state === "RETURNING") {
                     s.state = "IDLE";
                 }
             }
@@ -675,81 +249,30 @@
     }
 
     setInterval(() => {
-        if (placedBuildings.length > 0 && customers.length < 8) {
-            const randomBuilding = placedBuildings[Math.floor(Math.random() * placedBuildings.length)];
-            const shirtColors = ["#ef4444", "#ec4899", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b"];
-            
+        if (placedBuildings.length > 0 && customers.length < 5) {
+            let randomBuilding = placedBuildings[Math.floor(Math.random() * placedBuildings.length)];
             customers.push({
-                x: ENTRANCE.x,
-                y: ENTRANCE.y,
-                targetX: randomBuilding.x,
-                targetY: randomBuilding.y,
-                state: "SHOPPING",
-                targetBuilding: randomBuilding,
-                hasItem: false,
-                itemValue: 0,
-                shirtColor: shirtColors[Math.floor(Math.random() * shirtColors.length)],
-                speed: 0.035 + Math.random() * 0.015,
-                isStaff: false
+                x: ENTRANCE.x, y: ENTRANCE.y,
+                targetX: randomBuilding.x, targetY: randomBuilding.y,
+                state: "SHOPPING", targetBuilding: randomBuilding,
+                hasItem: false, itemValue: 0, speed: 0.04, isStaff: false
             });
         }
-        customerRate = customers.length * 12;
-        document.getElementById('txtCustomers').innerText = `${customerRate}/min`;
-    }, 2200);
+    }, 2500);
 
     function setupUI() {
         const container = document.getElementById('deptList');
         container.innerHTML = "";
-
         Object.keys(GAME_CONFIG.departments).forEach(key => {
             const d = GAME_CONFIG.departments[key];
-            const isSelected = key === selectedDeptKey;
-            const canAfford = playerMoney >= d.cost;
-
-            const card = document.createElement('div');
-            card.className = `p-3.5 rounded-xl border transition cursor-pointer flex flex-col gap-2 ${isSelected ? 'active-dept border-blue-500' : 'bg-slate-800/60 border-slate-700/60 hover:bg-slate-800'}`;
-            card.onclick = () => {
-                selectedDeptKey = key;
-                setupUI();
-            };
-
-            card.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm" style="background-color: ${d.color}">
-                            <i class="fa-solid ${d.icon}"></i>
-                        </div>
-                        <div>
-                            <div class="font-bold text-sm text-slate-100">${d.name}</div>
-                            <div class="text-xs text-slate-400">Taille: ${d.size.w}x${d.size.h} cases</div>
-                        </div>
-                    </div>
-                    <div class="font-extrabold text-sm ${canAfford ? 'text-amber-400' : 'text-slate-500'}">
-                        ${d.cost} 🪙
-                    </div>
-                </div>
-                <div class="text-xs text-slate-400 leading-relaxed">${d.description}</div>
-                <div class="flex justify-between items-center text-xs font-semibold pt-1 border-t border-slate-700/40">
-                    <span class="text-emerald-400">+${d.incomePerSale} 🪙 / vente</span>
-                    <span class="text-slate-400">Stock max: ${Math.round(d.capacity * upgrades.capacity.multiplier)}</span>
-                </div>
-            `;
-            container.appendChild(card);
+            const btn = document.createElement('button');
+            btn.className = `dept-btn ${key === selectedDeptKey ? 'active' : ''}`;
+            btn.disabled = playerMoney < d.cost;
+            btn.innerHTML = `<b>${d.name}</b><br>Coût: ${d.cost} 🪙 | Vente: +${d.incomePerSale} 🪙`;
+            btn.onclick = () => { selectedDeptKey = key; setupUI(); };
+            container.appendChild(btn);
         });
-
         document.getElementById('txtMoney').innerText = `${playerMoney} 🪙`;
-
-        document.getElementById('costSpeed').innerText = `${upgrades.speed.cost} 🪙`;
-        document.getElementById('costCap').innerText = `${upgrades.capacity.cost} 🪙`;
-        document.getElementById('costStaff').innerText = `${upgrades.staff.cost} 🪙`;
-        
-        document.getElementById('lvlSpeed').innerText = `Niv ${upgrades.speed.level}`;
-        document.getElementById('lvlCap').innerText = `Niv ${upgrades.capacity.level}`;
-        document.getElementById('lvlStaff').innerText = `${upgrades.staff.count} Staff`;
-
-        document.getElementById('btnUpgradeSpeed').disabled = playerMoney < upgrades.speed.cost;
-        document.getElementById('btnUpgradeCap').disabled = playerMoney < upgrades.capacity.cost;
-        document.getElementById('btnUpgradeStaff').disabled = playerMoney < upgrades.staff.cost;
     }
 
     function updateUI() {
@@ -757,42 +280,7 @@
         setupUI();
     }
 
-    function switchTab(tab) {
-        document.getElementById('tabDepts').classList.toggle('hidden', tab !== 'depts');
-        document.getElementById('tabUpgrades').classList.toggle('hidden', tab !== 'upgrades');
-        
-        document.getElementById('tabDeptsBtn').classList.toggle('border-blue-500', tab === 'depts');
-        document.getElementById('tabDeptsBtn').classList.toggle('text-blue-400', tab === 'depts');
-        document.getElementById('tabUpgradesBtn').classList.toggle('border-blue-500', tab === 'upgrades');
-        document.getElementById('tabUpgradesBtn').classList.toggle('text-blue-400', tab === 'upgrades');
-    }
-
-    function buyUpgrade(type) {
-        if (type === 'speed' && playerMoney >= upgrades.speed.cost) {
-            playerMoney -= upgrades.speed.cost;
-            upgrades.speed.level++;
-            upgrades.speed.value += 0.02;
-            upgrades.speed.cost = Math.round(upgrades.speed.cost * 1.8);
-            playSound('buy');
-        } 
-        else if (type === 'capacity' && playerMoney >= upgrades.capacity.cost) {
-            playerMoney -= upgrades.capacity.cost;
-            upgrades.capacity.level++;
-            upgrades.capacity.multiplier += 0.5;
-            upgrades.capacity.cost = Math.round(upgrades.capacity.cost * 2.1);
-            playSound('buy');
-        } 
-        else if (type === 'staff' && playerMoney >= upgrades.staff.cost) {
-            playerMoney -= upgrades.staff.cost;
-            upgrades.staff.count++;
-            upgrades.staff.cost = Math.round(upgrades.staff.cost * 2.5);
-            initStaff();
-            playSound('buy');
-        }
-        updateUI();
-    }
-
-    canvas.addEventListener('pointerdown', (e) => {
+    canvas.addEventListener('mousedown', (e) => {
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -800,7 +288,7 @@
         const halfTile = tileSize / 2;
         const quarterTile = tileSize / 4;
         const recenteredX = mouseX - canvas.width / 2;
-        const recenteredY = mouseY - canvas.height / 5;
+        const recenteredY = mouseY - canvas.height / 6;
 
         let gx = Math.round((recenteredX / halfTile + recenteredY / quarterTile) / 2);
         let gy = Math.round((recenteredY / quarterTile - recenteredX / halfTile) / 2);
@@ -814,17 +302,7 @@
             }
 
             playerMoney -= config.cost;
-            playSound('buy');
-
-            const maxCap = Math.round(config.capacity * upgrades.capacity.multiplier);
-            const newBuilding = {
-                x: gx,
-                y: gy,
-                type: selectedDeptKey,
-                currentStock: maxCap,
-                beingRefilled: false
-            };
-
+            const newBuilding = { x: gx, y: gy, type: selectedDeptKey, currentStock: config.capacity, beingRefilled: false };
             placedBuildings.push(newBuilding);
 
             for (let iy = 0; iy < config.size.h; iy++) {
@@ -832,63 +310,39 @@
                     gridData[gy + iy][gx + ix] = newBuilding;
                 }
             }
-
             updateUI();
         }
     });
 
-    function resizeCanvas() {
-        const container = canvas.parentElement;
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    function renderGame() {
-        updateSimulation();
-
+    function gameLoop() {
+        updateAgents();
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Sol
         for (let y = 0; y < gridHeight; y++) {
             for (let x = 0; x < gridWidth; x++) {
                 let isEntrance = (x === ENTRANCE.x && y === ENTRANCE.y);
                 let isStock = (x === STOCK_ROOM.x && y === STOCK_ROOM.y);
-                
-                let tileColor = "#1e293b";
-                let strokeColor = "rgba(255, 255, 255, 0.05)";
-
-                if (isEntrance) { tileColor = "#334155"; strokeColor = "#38bdf8"; }
-                if (isStock) { tileColor = "#451a03"; strokeColor = "#f59e0b"; }
-
-                drawIsoTile(x, y, tileColor, strokeColor);
+                let tileColor = isEntrance ? "#475569" : (isStock ? "#854d0e" : "#1e293b");
+                drawIsoTile(x, y, tileColor);
             }
         }
 
-        const pEnt = iso(ENTRANCE.x, ENTRANCE.y);
-        ctx.fillStyle = "#38bdf8";
-        ctx.font = "bold 10px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText("ENTRÉE", pEnt.x, pEnt.y + 12);
+        // Caisse Enregistreuse
+        drawIsoTile(CHECKOUT.x, CHECKOUT.y, "#16a34a", "#15803d");
 
-        const pStock = iso(STOCK_ROOM.x, STOCK_ROOM.y);
-        ctx.fillStyle = "#f59e0b";
-        ctx.fillText("RÉSERVE", pStock.x, pStock.y + 12);
+        // Rayons
+        placedBuildings.forEach(b => drawBuilding(b));
 
-        drawCheckoutRegister();
+        // PNJ
+        staffMembers.forEach(s => drawAgent(s));
+        customers.forEach(c => drawAgent(c));
 
-        placedBuildings.sort((a, b) => (a.x + a.y) - (b.x + b.y));
-        placedBuildings.forEach(b => drawBuildingDiorama(b));
-
-        staffMembers.forEach(s => drawAgent({ ...s, isStaff: true }));
-        customers.forEach(c => drawAgent({ ...c, isStaff: false }));
-
-        requestAnimationFrame(renderGame);
+        requestAnimationFrame(gameLoop);
     }
 
-    initStaff();
     setupUI();
-    renderGame();
+    gameLoop();
 </script>
 </body>
 </html>

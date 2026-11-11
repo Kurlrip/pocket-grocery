@@ -13,6 +13,8 @@
         toastTimer = 0,
         helpWasPaused = false;
     const moneyFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+    const touches = new Map();
+    let touchGesture = false;
     const $ = (id) => document.getElementById(id);
     function toast(text, error = false) {
         $('toast').textContent = text;
@@ -101,15 +103,8 @@
             });
         }),
     );
-    canvas.addEventListener('pointermove', (e) => {
-        hover = renderer.pick(e.clientX, e.clientY);
-    });
-    canvas.addEventListener('pointerleave', () => {
-        hover = null;
-    });
-    canvas.addEventListener('pointerdown', (e) => {
-        if (e.button !== 0) return;
-        hover = renderer.pick(e.clientX, e.clientY);
+    function activateTile(x, y) {
+        hover = renderer.pick(x, y);
         if (!selected) return;
         const result = Store.place(state, selected, hover.x, hover.y);
         if (!result.ok) toast(result.reason, true);
@@ -118,10 +113,64 @@
             drainEvents();
         }
         updateUI();
+    }
+    const point = (e) => ({ x: e.clientX, y: e.clientY });
+    const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const midpoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const tapSlop = 8;
+    canvas.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
+        if (e.pointerType !== 'touch') {
+            activateTile(e.clientX, e.clientY);
+            return;
+        }
+        canvas.setPointerCapture(e.pointerId);
+        touches.set(e.pointerId, point(e));
+        touchGesture ||= touches.size > 1;
+        hover = null;
+    });
+    canvas.addEventListener('pointermove', (e) => {
+        const next = point(e);
+        if (e.pointerType !== 'touch') {
+            hover = renderer.pick(next.x, next.y);
+            return;
+        }
+        const previous = touches.get(e.pointerId);
+        if (!previous) return;
+        if (touches.size === 1) {
+            if (!touchGesture && distance(previous, next) < tapSlop) return;
+            touchGesture = true;
+            renderer.moveCamera(previous, next);
+            touches.set(e.pointerId, next);
+            return;
+        }
+        const [first, second] = touches.values();
+        touches.set(e.pointerId, next);
+        const [nextFirst, nextSecond] = touches.values();
+        // Use the same pair until one of those fingers leaves the canvas.
+        renderer.moveCamera(
+            midpoint(first, second),
+            midpoint(nextFirst, nextSecond),
+            Math.max(1, distance(nextFirst, nextSecond)) / Math.max(1, distance(first, second)),
+        );
+    });
+    function endTouch(e) {
+        const previous = touches.get(e.pointerId);
+        if (!previous) return;
+        const tap = e.type === 'pointerup' && !touchGesture && distance(previous, point(e)) < tapSlop;
+        touches.delete(e.pointerId);
+        if (!touches.size) touchGesture = false;
+        if (tap) activateTile(e.clientX, e.clientY);
+    }
+    canvas.addEventListener('pointerup', endTouch);
+    canvas.addEventListener('pointercancel', endTouch);
+    canvas.addEventListener('lostpointercapture', endTouch);
+    canvas.addEventListener('pointerleave', () => {
+        if (!touches.size) hover = null;
     });
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        cancel();
+        if (e.pointerType !== 'touch' && !touches.size) cancel();
     });
     window.addEventListener('keydown', (e) => {
         if ($('helpDialog').open) return;

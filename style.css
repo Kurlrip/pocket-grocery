@@ -440,6 +440,8 @@ canvas {
     width: 100%;
     height: 100%;
     position: absolute;
+}
+#gameCanvas {
     touch-action: none;
 }
 .scene-bottom {
@@ -495,12 +497,14 @@ canvas {
 }
 .build-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 10px 16px;
     margin: 0 0 15px;
 }
 .build-header .eyebrow {
-    font-size: 7px;
+    font-size: 10px;
     letter-spacing: 1.3px;
 }
 .build-header h2 {
@@ -514,7 +518,8 @@ canvas {
     border: 1px solid #dfe3d5;
     border-radius: 7px;
     background: #fffdf6;
-    font-size: 10px;
+    font-size: 13px;
+    min-height: 44px;
     padding: 9px 12px;
     white-space: nowrap;
 }
@@ -534,21 +539,25 @@ kbd {
 .catalog {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
+    gap: 12px;
 }
 .catalog-card {
     position: relative;
+    display: flex;
+    flex-direction: column;
     text-align: left;
     border: 1px solid #e1e5d9;
     background: #fffef8;
     border-radius: 10px;
-    padding: 9px 12px 12px;
+    padding: 10px 12px 12px;
     min-width: 0;
 }
-.catalog-card:hover {
-    transform: translateY(-3px);
-    border-color: #b5c69d;
-    background: #fffffa;
+@media (hover: hover) {
+    .catalog-card:hover {
+        transform: translateY(-3px);
+        border-color: #b5c69d;
+        background: #fffffa;
+    }
 }
 .catalog-card.selected {
     border-color: #6f915c;
@@ -561,7 +570,8 @@ kbd {
 .catalog-card canvas {
     position: static;
     width: 100%;
-    height: 69px;
+    height: 84px;
+    object-fit: contain;
     pointer-events: none;
 }
 .catalog-card .number {
@@ -572,41 +582,50 @@ kbd {
     font-size: 8px;
 }
 .catalog-card h3 {
-    font-size: 10px;
+    font-size: 15px;
     font-weight: 650;
     margin: 5px 0 4px;
-    white-space: nowrap;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
 }
 .catalog-card p {
-    font-size: 8px;
-    color: #929b89;
-    white-space: nowrap;
+    font-size: 13px;
+    color: #57664e;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
 }
 .card-price {
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: baseline;
     justify-content: space-between;
-    margin-top: 11px;
-    font-size: 11px;
+    gap: 4px 8px;
+    width: 100%;
+    margin-top: auto;
+    padding-top: 10px;
+    font-size: 16px;
     font-weight: 650;
 }
+.card-price span {
+    white-space: nowrap;
+}
 .card-price span:last-child {
-    font-size: 8px;
+    font-size: 12px;
     font-weight: 400;
-    color: #8b977d;
+    color: #57664e;
 }
 .catalog-note {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: 15px;
+    gap: 4px 15px;
     margin: 12px 0 0;
-    font-size: 8px;
-    color: #949d88;
+    font-size: 12px;
+    color: #57664e;
     line-height: 1.5;
 }
 .catalog-note > span:last-child {
-    color: #6b8458;
-    text-align: right;
+    color: var(--green);
 }
 #toast {
     position: absolute;
@@ -710,11 +729,10 @@ dialog li {
     .catalog-card {
         padding: 12px 16px 15px;
     }
-    .catalog-card h3 {
-        font-size: 12px;
-    }
-    .catalog-card p {
-        font-size: 9px;
+}
+@media (max-width: 1179px) {
+    .catalog {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 @media (max-width: 1100px) {
@@ -740,29 +758,8 @@ dialog li {
     .scene-heading h2 > span {
         display: none;
     }
-    .catalog {
-        gap: 7px;
-    }
-    .catalog-card {
-        padding: 6px 8px 10px;
-    }
-    .catalog-card p {
-        display: none;
-    }
-    .catalog-card h3 {
-        font-size: 9px;
-    }
-    .card-price {
-        font-size: 10px;
-    }
-    .card-price span:last-child {
-        font-size: 7px;
-    }
     .scene-panel {
         min-height: 430px;
-    }
-    .catalog-note > span:last-child {
-        display: none;
     }
 }
 @media (max-width: 760px) {
@@ -886,41 +883,28 @@ dialog li {
         width: 26px;
         height: 24px;
     }
-    .build-header h2 {
-        font-size: 17px;
-    }
-    .quiet-button {
-        font-size: 9px;
-        padding: 8px;
-    }
     .quiet-button kbd {
         display: none;
     }
+}
+@media (max-width: 600px) {
     .catalog {
-        grid-template-columns: repeat(5, 115px);
-        overflow-x: auto;
-        padding: 3px 2px 8px;
-        scroll-snap-type: x proximity;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 340px) {
+    .catalog {
+        grid-template-columns: minmax(0, 1fr);
     }
     .catalog-card {
-        scroll-snap-align: start;
+        display: grid;
+        grid-template-columns: 80px minmax(0, 1fr);
+        column-gap: 12px;
     }
     .catalog-card canvas {
-        height: 65px;
-    }
-    .catalog-card h3 {
-        font-size: 10px;
-    }
-    .catalog-card p {
-        display: block;
-        font-size: 7px;
-    }
-    .catalog-note {
-        font-size: 7px;
-        margin-top: 7px;
-    }
-    .build-header {
-        margin-bottom: 10px;
+        grid-row: span 3;
+        align-self: center;
+        height: 64px;
     }
 }
 @media (prefers-reduced-motion: reduce) {

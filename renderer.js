@@ -370,7 +370,7 @@
         walls() {
             const entrance = Store.DEPOT.x;
             this.wallFace(true, 0, entrance - 0.2);
-            this.wallFace(true, entrance + 1.2, 10);
+            this.wallFace(true, entrance + 1.2, 10, 0, 12);
             this.wallFace(false);
             const c = this.ctx,
                 p = this.p(0, 4.8, 43);
@@ -385,13 +385,17 @@
         }
         drawStockroom() {
             const x = Store.DEPOT.x;
-            this.box(x - 0.75, -2.3, 2.75, 2.3, -15, 15, '#dcc8a5', '#b79267', '#a17a57');
-            for (let tile = 0; tile < 3; tile++)
-                this.line(this.p(x - 0.7 + tile * 0.9, -2.3), this.p(x - 0.7 + tile * 0.9, 0), '#ab896a80');
-            this.line(this.p(x - 0.75, -1.14), this.p(x + 2, -1.14), '#ab896a80');
-            this.wallFace(true, x - 0.75, x + 2, -2.3, 54);
-            this.wallFace(false, -2.3, 0, x - 0.75, 54);
-            const sign = this.p(x + 0.66, -2.29, 43);
+            this.box(x - 1, -2.5, 3, 2.5, -15, 15, '#dfceb4', '#c99772', '#ac7a57');
+            for (let column = -1; column < 2; column++) {
+                for (let row = -3; row < 0; row++) {
+                    const y = Math.max(row, -2.5);
+                    const color = (column + row) % 2 ? '#d5c2a5' : '#e8d9c0';
+                    this.surface(x + column, y, 1, row + 1 - y, 0.1, color, '#af96765e');
+                }
+            }
+            this.wallFace(true, x - 1, x + 2, -2.5, 54);
+            this.wallFace(false, -2.5, 0, x - 1, 54);
+            const sign = this.p(x + 0.66, -2.49, 43);
             this.ctx.save();
             this.ctx.translate(sign.x, sign.y);
             this.ctx.transform(1, 0.5, 0, 1, 0, 0);
@@ -490,7 +494,6 @@
                 this.surface(editing.x, editing.y, w, h, 1, '#62a6d878', '#2674a7');
             }
             this.walls();
-            this.surface(Store.DEPOT.x - 0.16, -0.18, 1.32, 0.38, 0.5, '#a78d69');
             this.surface(4.04, 9.55, 0.92, 0.46, 0.2, '#855145', '#b47e60');
             const renderables = state.buildings.map((b) => ({
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
@@ -539,10 +542,10 @@
             renderables.push({
                 depth: 8.5,
                 draw: () => {
-                    const x = Store.DEPOT.x + 1.42;
-                    if (this.sprite('furniture', 'stock', x, -1.08, 48)) return;
-                    this.box(x - 0.35, -1.36, 0.7, 0.65, 0, 18, '#c6ad7e', '#b29a6e', '#a48c60');
-                    this.box(x - 0.35, -1.31, 0.62, 0.52, 18, 15, '#d8c397', '#bfa775', '#ae9667');
+                    const x = Store.DEPOT.x + 1.48, y = -1.46;
+                    if (this.sprite('furniture', 'stock', x, y, 45)) return;
+                    this.box(x - 0.35, y - 0.28, 0.7, 0.65, 0, 18, '#c6ad7e', '#b29a6e', '#a48c60');
+                    this.box(x - 0.35, y - 0.23, 0.62, 0.52, 18, 15, '#d8c397', '#bfa775', '#ae9667');
                 },
             });
             renderables.push({ depth: 21, draw: () => this.frontGlass() });

@@ -108,6 +108,9 @@ h1, h2, h3, p { margin: 0; }
 .mission .art { color: #8c502e; }
 .scene { position: relative; min-height: 0; isolation: isolate; }
 #gameCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#gameCanvas { cursor: grab; }
+#gameCanvas.placing { cursor: crosshair; }
+#gameCanvas.panning { cursor: grabbing; }
 .scene-toolbar {
     position: absolute;
     top: 10px;

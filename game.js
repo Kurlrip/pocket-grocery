@@ -18,6 +18,7 @@
     const moneyFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
     const touches = new Map();
     let touchGesture = false;
+    let mousePress = null;
     const $ = (id) => document.getElementById(id);
     const panel = $('gamePanel');
     const panelBody = panel.querySelector('.panel-body');
@@ -170,7 +171,7 @@
             $('placementName').textContent = Store.CATALOG[editing.type].name;
             $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} en stock`;
         }
-        canvas.style.cursor = selected ? 'crosshair' : 'default';
+        canvas.classList.toggle('placing', !!selected);
         $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';
         const pauseButton = $('pauseButton');
         pauseButton.textContent = paused ? '▶' : 'Ⅱ';
@@ -263,6 +264,11 @@
     const tapSlop = 8;
     canvas.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
+        if (e.pointerType === 'mouse') {
+            canvas.setPointerCapture(e.pointerId);
+            mousePress = { id: e.pointerId, previous: point(e), dragging: false };
+            return;
+        }
         if (e.pointerType !== 'touch') {
             activateTile(e.clientX, e.clientY);
             return;
@@ -274,6 +280,16 @@
     });
     canvas.addEventListener('pointermove', (e) => {
         const next = point(e);
+        if (mousePress?.id === e.pointerId) {
+            const { previous, dragging } = mousePress;
+            if (!dragging && distance(previous, next) < tapSlop) return;
+            mousePress.dragging = true;
+            mousePress.previous = next;
+            canvas.classList.add('panning');
+            hover = null;
+            renderer.moveCamera(previous, next);
+            return;
+        }
         if (e.pointerType !== 'touch') {
             hover = renderer.pick(next.x, next.y);
             return;
@@ -297,7 +313,19 @@
             Math.max(1, distance(nextFirst, nextSecond)) / Math.max(1, distance(first, second)),
         );
     });
-    function endTouch(e) {
+    function endPointer(e) {
+        if (mousePress?.id === e.pointerId) {
+            const { previous, dragging } = mousePress;
+            mousePress = null;
+            canvas.classList.remove('panning');
+            if (e.type !== 'pointerup' || document.elementFromPoint(e.clientX, e.clientY) !== canvas) {
+                hover = null;
+                return;
+            }
+            hover = renderer.pick(e.clientX, e.clientY);
+            if (!dragging && distance(previous, point(e)) < tapSlop) activateTile(e.clientX, e.clientY);
+            return;
+        }
         const previous = touches.get(e.pointerId);
         if (!previous) return;
         const tap = e.type === 'pointerup' && !touchGesture && distance(previous, point(e)) < tapSlop;
@@ -305,9 +333,9 @@
         if (!touches.size) touchGesture = false;
         if (tap) activateTile(e.clientX, e.clientY, true);
     }
-    canvas.addEventListener('pointerup', endTouch);
-    canvas.addEventListener('pointercancel', endTouch);
-    canvas.addEventListener('lostpointercapture', endTouch);
+    canvas.addEventListener('pointerup', endPointer);
+    canvas.addEventListener('pointercancel', endPointer);
+    canvas.addEventListener('lostpointercapture', endPointer);
     canvas.addEventListener('pointerleave', () => {
         if (!touches.size) hover = null;
     });

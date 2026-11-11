@@ -4,7 +4,7 @@
     // Framing rectangles in the thumbnail canvas, measured with and without the sprite atlas.
     const thumbnailBounds = {
         produce: [[91, 110, 156, 150], [91, 144, 152, 132]],
-        bakery: [[87, 103, 156, 158], [91, 142, 153, 136]],
+        bakery: [[87, 93, 156, 168], [91, 142, 153, 136]],
         dairy: [[87, 77, 160, 193], [93, 110, 148, 168]],
         grocery: [[88, 78, 157, 192], [94, 102, 147, 163]],
         flowers: [[96, 157, 89, 76], [100, 133, 79, 115]],
@@ -423,7 +423,6 @@
         }
         drawStreet() {
             this.surface(-1.15, -1.1, 12.4, 13.1, -15, '#a8c66b', '#72984d');
-            this.surface(11.1, 1.75, 3.5, 2.15, -15, '#b4cb7b', '#72984d');
             this.box(-0.8, 10, 11.6, 1.55, -23, 12, '#f4dbc0', '#c59a7c', '#ab806c');
             for (let x = -0.5; x < 10.8; x += 0.5)
                 this.line(this.p(x, 10, -10), this.p(x, 11.55, -10), '#b8927566');
@@ -479,9 +478,8 @@
                 ['blossom', -0.75, 6.6, 83],
                 ['hedge', 4.1, -0.7, 79],
                 ['tree', 8.5, -3.1, 110],
-                ['storefront', 13.7, 2.5, 94],
             ]) {
-                this.sprite(name === 'storefront' ? 'buildings' : 'furniture', name, x, y, width);
+                this.sprite('furniture', name, x, y, width);
             }
             this.drawStockroom();
             this.box(0, 0, 10, 10, -15, 15, '#f9dfc4', '#c99772', '#ac7a57');

@@ -1,11 +1,14 @@
-# Pocket Grocery
+# Commerce Town / Pocket Grocery
 
-- Prototype navigateur HTML/Canvas, JavaScript classique ; pas d'Unreal ni de bundler.
-- `index.html` porte la simulation existante. Étendre ce prototype avant d'introduire un framework.
-- `isometric.js` expose `Isometric` dans le navigateur et `module.exports` pour Node.
-- Lancement : `python -m http.server 8080` ; tests : `node --test tests/*.test.cjs`.
-- Vérifier `git diff --check` et le navigateur après modification du rendu.
-- Préserver `spritesheet.png` : c'est une planche illustrée opaque, pas un atlas prêt à produire.
-- Ne pas présenter les images de la conversation comme intégrées : leurs fichiers source ne sont pas disponibles dans cette reprise.
+- Prototype HTML/Canvas, JavaScript classique, sans bundler ni dépendance d'exécution.
+- Lancer en ouvrant `index.html` ou avec `python -m http.server 8080`.
+- Tests : `node --test tests/*.test.cjs` ; vérifier aussi `node --check game.js`, `node --check renderer.js` et `git diff --check`.
+- Vérifier le rendu et les interactions dans un vrai navigateur après modification de l'interface.
+- `game-core.js` : état et simulation pure, exportés via `Store`/`module.exports`. Catalogue et objectifs font autorité ici.
+- `game.js` : DOM, commandes et pas fixe 1/30 s. `renderer.js` : rendu et hit-testing via la même caméra. `isometric.js` : projection.
+- Les cases d'agents utilisent des coordonnées entières centrées par le renderer (+0.5). Les emprises du mobilier commencent au coin des cases.
+- Toute construction doit préserver les trajets et l'accès à la caisse, à la réserve et à chaque rayon. Les primes doivent être versées une seule fois.
+- Aucun sprite requis : le diorama est procédural. Conserver l'ancienne `spritesheet.png` tant qu'aucune suppression n'est demandée ; le jeu ne la charge plus.
 - Travailler sur une branche distincte ; ne pas fusionner ou déployer sans demande.
-- Pas de sauvegarde, pathfinding ou inventaire global. Ne pas annoncer ces systèmes comme présents.
+- Pas de sauvegarde, rotation, destruction de mobilier ou file d'attente physique. La simulation ignore les collisions entre agents, mais contourne le mobilier.
+- L'historique `docs/PROJECT-STATE.md` décrit l'inspection initiale, pas les fonctions de la version actuelle. Lire `docs/COZY-STORE.md` et README pour celle-ci.

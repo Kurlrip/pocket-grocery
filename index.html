@@ -1,340 +1,147 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pocket Grocery - Hypermarché Diorama</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; background-color: #1a1a2e; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; display: flex; height: 100vh; }
-        #sidebar { width: 320px; background: #16213e; border-right: 2px solid #0f3460; padding: 15px; display: flex; flex-direction: column; gap: 12px; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.5); }
-        h2 { margin: 0 0 5px 0; color: #e94560; font-size: 1.3rem; }
-        .stat-box { background: #0f3460; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 1.1rem; display: flex; justify-content: space-between; }
-        .dept-btn { background: #0f3460; color: #fff; border: 1px solid #e94560; padding: 10px; border-radius: 6px; cursor: pointer; text-align: left; transition: all 0.2s; }
-        .dept-btn:hover { background: #e94560; }
-        .dept-btn.active { background: #e94560; font-weight: bold; border-color: #fff; }
-        .dept-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #555; }
-        #gameContainer { flex-grow: 1; position: relative; background: #0f172a; display: flex; justify-content: center; align-items: center; }
-        canvas { border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); background-color: #0f172a; }
-        .info-panel { background: rgba(22, 33, 62, 0.9); border: 1px solid #0f3460; padding: 10px; border-radius: 6px; font-size: 0.85rem; line-height: 1.4; }
-    </style>
-</head>
-<body>
-
-<div id="sidebar">
-    <h2>Pocket Grocery</h2>
-    <div class="stat-box">
-        <span>Trésorerie :</span>
-        <span id="txtMoney">200 🪙</span>
-    </div>
-    
-    <div style="font-weight: bold; margin-top: 5px;">Placer un Rayon :</div>
-    <div id="deptList" style="display: flex; flex-direction: column; gap: 8px;"></div>
-
-    <div class="info-panel">
-        <b>État des Sprites :</b> <span id="spriteStatus" style="color: #f59e0b;">Chargement...</span><br>
-        • <b>Source :</b> <code>spritesheet.png</code> à la racine.<br>
-        • <b>Fallback :</b> Vectoriel auto si l'image est indisponible.
-    </div>
-</div>
-
-<div id="gameContainer">
-    <canvas id="gameCanvas" width="900" height="700"></canvas>
-</div>
-
-<script src="isometric.js"></script>
-<script>
-    // 1. CHARGEMENT DE LA SPRITESHEET DU DÉPÔT
-    const spriteSheet = new Image();
-    spriteSheet.src = 'spritesheet.png';
-
-    let useSprites = false;
-
-    spriteSheet.onload = () => {
-        useSprites = true;
-        document.getElementById('spriteStatus').innerText = "Actif (spritesheet.png)";
-        document.getElementById('spriteStatus').style.color = "#10b981";
-    };
-
-    spriteSheet.onerror = () => {
-        useSprites = false;
-        document.getElementById('spriteStatus').innerText = "Mode Vectoriel (Image non trouvée)";
-        document.getElementById('spriteStatus').style.color = "#ef4444";
-    };
-
-    // 2. CONFIGURATION ÉCONOMIQUE ET DÉCOUPE DES SPRITES
-    const GAME_CONFIG = {
-        departments: {
-            produce: { id: "produce", name: "Fruits & Légumes", cost: 100, capacity: 15, incomePerSale: 5, size: { w: 2, h: 1 }, color: "#4caf50", topColor: "#81c784", spriteRect: { x: 250, y: 350, w: 250, h: 180 } },
-            dairy:   { id: "dairy",   name: "Frais & Laitiers",  cost: 300, capacity: 25, incomePerSale: 12, size: { w: 2, h: 1 }, color: "#0288d1", topColor: "#4fc3f7", spriteRect: { x: 40, y: 350, w: 200, h: 180 } },
-            grocery: { id: "grocery", name: "Épicerie Sèche",   cost: 750, capacity: 40, incomePerSale: 25, size: { w: 2, h: 2 }, color: "#f57c00", topColor: "#ffb74d", spriteRect: { x: 530, y: 350, w: 250, h: 210 } },
-            frozen:  { id: "frozen",  name: "Surgelés",         cost: 1500, capacity: 30, incomePerSale: 45, size: { w: 2, h: 1 }, color: "#0097a7", topColor: "#80deea", spriteRect: { x: 280, y: 560, w: 220, h: 180 } },
-            non_food:{ id: "non_food",name: "Non-Alimentaire",  cost: 3500, capacity: 20, incomePerSale: 90, size: { w: 2, h: 2 }, color: "#7b1fa2", topColor: "#ba68c8", spriteRect: { x: 530, y: 560, w: 250, h: 210 } }
-        }
-    };
-
-    let playerMoney = 200;
-    let selectedDeptKey = "produce";
-    
-    const gridWidth = 12;
-    const gridHeight = 12;
-    const tileSize = 56;
-    let gridData = Array(gridHeight).fill().map(() => Array(gridWidth).fill(0));
-    let placedBuildings = [];
-
-    let customers = [];
-    let staffMembers = [];
-
-    const ENTRANCE = { x: 0, y: 11 };
-    const CHECKOUT = { x: 2, y: 2 };
-    const STOCK_ROOM = { x: 11, y: 0 };
-
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-
-    staffMembers.push({
-        x: STOCK_ROOM.x, y: STOCK_ROOM.y,
-        targetX: STOCK_ROOM.x, targetY: STOCK_ROOM.y,
-        state: "IDLE", targetBuilding: null, speed: 0.05, isStaff: true
-    });
-
-    function iso(x, y) {
-        return Isometric.project(x, y, tileSize, { x: canvas.width / 2, y: canvas.height / 6 });
-    }
-
-    function drawIsoTile(x, y, color, strokeColor = "#1e293b") {
-        const p = iso(x, y);
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x + tileSize / 2, p.y + tileSize / 4);
-        ctx.lineTo(p.x, p.y + tileSize / 2);
-        ctx.lineTo(p.x - tileSize / 2, p.y + tileSize / 4);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.strokeStyle = strokeColor;
-        ctx.stroke();
-    }
-
-    // Dessin hybride : Sprite si chargé, 3D Isométrique vectorielle sinon
-    function drawBuilding(b) {
-        const config = GAME_CONFIG.departments[b.type];
-        const p = iso(b.x, b.y);
-
-        if (useSprites) {
-            const s = config.spriteRect;
-            ctx.drawImage(spriteSheet, s.x, s.y, s.w, s.h, p.x - 45, p.y - 50, 90, 80);
-        } else {
-            const height = 30;
-            // Haut
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y - height);
-            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4 - height);
-            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
-            ctx.lineTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4 - height);
-            ctx.closePath();
-            ctx.fillStyle = config.topColor;
-            ctx.fill();
-            ctx.strokeStyle = "#1a1a1a";
-            ctx.stroke();
-
-            // Gauche
-            ctx.beginPath();
-            ctx.moveTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4 - height);
-            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
-            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4);
-            ctx.lineTo(p.x - (tileSize * config.size.h) / 2, p.y + (tileSize * config.size.h) / 4);
-            ctx.closePath();
-            ctx.fillStyle = config.color;
-            ctx.fill();
-            ctx.stroke();
-
-            // Droite
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4 - height);
-            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4 - height);
-            ctx.lineTo(p.x + (tileSize * config.size.w) / 2, p.y + (tileSize * config.size.w) / 4);
-            ctx.lineTo(p.x, p.y + (tileSize * (config.size.w + config.size.h)) / 4);
-            ctx.closePath();
-            ctx.fillStyle = config.color;
-            ctx.fill();
-            ctx.stroke();
-        }
-
-        // Texte
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 11px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillText(config.name, p.x, p.y - 42);
-
-        // Jauge de stock
-        const stockPercent = b.currentStock / config.capacity;
-        ctx.fillStyle = "rgba(0,0,0,0.8)";
-        ctx.fillRect(p.x - 22, p.y - 38, 44, 6);
-        ctx.fillStyle = stockPercent > 0.25 ? "#4caf50" : "#f44336";
-        ctx.fillRect(p.x - 21, p.y - 37, 42 * stockPercent, 4);
-    }
-
-    function drawAgent(agent) {
-        const p = iso(agent.x, agent.y);
-        
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 2, 8, 4, 0, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,0,0,0.3)";
-        ctx.fill();
-
-        ctx.fillStyle = agent.isStaff ? "#2563eb" : "#e11d48";
-        ctx.beginPath();
-        ctx.arc(p.x, p.y - 16, 7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(p.x - 5, p.y - 10, 10, 12);
-        ctx.strokeStyle = "#000";
-        ctx.stroke();
-    }
-
-    function updateAgents() {
-        customers.forEach((c, index) => {
-            c.x += (c.targetX - c.x) * c.speed;
-            c.y += (c.targetY - c.y) * c.speed;
-            if (Math.hypot(c.targetX - c.x, c.targetY - c.y) < 0.1) {
-                if (c.state === "SHOPPING" && c.targetBuilding) {
-                    if (c.targetBuilding.currentStock > 0) {
-                        c.targetBuilding.currentStock--;
-                        c.hasItem = true;
-                        c.itemValue = GAME_CONFIG.departments[c.targetBuilding.type].incomePerSale;
-                    }
-                    c.state = "GOING_TO_CHECKOUT";
-                    c.targetX = CHECKOUT.x; c.targetY = CHECKOUT.y;
-                } else if (c.state === "GOING_TO_CHECKOUT") {
-                    if (c.hasItem) { playerMoney += c.itemValue; updateUI(); }
-                    c.state = "LEAVING";
-                    c.targetX = ENTRANCE.x; c.targetY = ENTRANCE.y;
-                } else if (c.state === "LEAVING") {
-                    customers.splice(index, 1);
-                }
-            }
-        });
-
-        staffMembers.forEach(s => {
-            s.x += (s.targetX - s.x) * s.speed;
-            s.y += (s.targetY - s.y) * s.speed;
-            const dist = Math.hypot(s.targetX - s.x, s.targetY - s.y);
-
-            if (s.state === "IDLE") {
-                let emptyBuilding = placedBuildings.find(b => b.currentStock < GAME_CONFIG.departments[b.type].capacity / 2 && !b.beingRefilled);
-                if (emptyBuilding) {
-                    s.targetBuilding = emptyBuilding;
-                    emptyBuilding.beingRefilled = true;
-                    s.state = "MOVING_TO_REFALL";
-                    s.targetX = emptyBuilding.x; s.targetY = emptyBuilding.y;
-                }
-            } else if (dist < 0.1) {
-                if (s.state === "MOVING_TO_REFALL") {
-                    s.state = "REFILLING";
-                    setTimeout(() => {
-                        if (s.targetBuilding) {
-                            s.targetBuilding.currentStock = GAME_CONFIG.departments[s.targetBuilding.type].capacity;
-                            s.targetBuilding.beingRefilled = false;
-                        }
-                        s.state = "RETURNING";
-                        s.targetX = STOCK_ROOM.x; s.targetY = STOCK_ROOM.y;
-                    }, 1500);
-                } else if (s.state === "RETURNING") {
-                    s.state = "IDLE";
-                }
-            }
-        });
-    }
-
-    setInterval(() => {
-        if (placedBuildings.length > 0 && customers.length < 5) {
-            let randomBuilding = placedBuildings[Math.floor(Math.random() * placedBuildings.length)];
-            customers.push({
-                x: ENTRANCE.x, y: ENTRANCE.y,
-                targetX: randomBuilding.x, targetY: randomBuilding.y,
-                state: "SHOPPING", targetBuilding: randomBuilding,
-                hasItem: false, itemValue: 0, speed: 0.04, isStaff: false
-            });
-        }
-    }, 2500);
-
-    function setupUI() {
-        const container = document.getElementById('deptList');
-        container.innerHTML = "";
-        Object.keys(GAME_CONFIG.departments).forEach(key => {
-            const d = GAME_CONFIG.departments[key];
-            const btn = document.createElement('button');
-            btn.className = `dept-btn ${key === selectedDeptKey ? 'active' : ''}`;
-            btn.disabled = playerMoney < d.cost;
-            btn.innerHTML = `<b>${d.name}</b><br>Coût: ${d.cost} 🪙 | Vente: +${d.incomePerSale} 🪙`;
-            btn.onclick = () => { selectedDeptKey = key; setupUI(); };
-            container.appendChild(btn);
-        });
-        document.getElementById('txtMoney').innerText = `${playerMoney} 🪙`;
-    }
-
-    function updateUI() {
-        document.getElementById('txtMoney').innerText = `${playerMoney} 🪙`;
-        setupUI();
-    }
-
-    canvas.addEventListener('mousedown', (e) => {
-        const rect = canvas.getBoundingClientRect();
-        if (e.button !== 0) return;
-        const mouseX = (e.clientX - rect.left) * canvas.width / rect.width;
-        const mouseY = (e.clientY - rect.top) * canvas.height / rect.height;
-        const { x: gx, y: gy } = Isometric.pick(mouseX, mouseY, tileSize,
-            { x: canvas.width / 2, y: canvas.height / 6 });
-
-        const config = GAME_CONFIG.departments[selectedDeptKey];
-        if (playerMoney >= config.cost && Isometric.canPlace(gridData, gx, gy, config.size,
-            [ENTRANCE, CHECKOUT, STOCK_ROOM])) {
-
-            playerMoney -= config.cost;
-            const newBuilding = { x: gx, y: gy, type: selectedDeptKey, currentStock: config.capacity, beingRefilled: false };
-            placedBuildings.push(newBuilding);
-
-            for (let iy = 0; iy < config.size.h; iy++) {
-                for (let ix = 0; ix < config.size.w; ix++) {
-                    gridData[gy + iy][gx + ix] = newBuilding;
-                }
-            }
-            updateUI();
-        }
-    });
-
-    function gameLoop() {
-        updateAgents();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Sol
-        for (let y = 0; y < gridHeight; y++) {
-            for (let x = 0; x < gridWidth; x++) {
-                let isEntrance = (x === ENTRANCE.x && y === ENTRANCE.y);
-                let isStock = (x === STOCK_ROOM.x && y === STOCK_ROOM.y);
-                let tileColor = isEntrance ? "#475569" : (isStock ? "#854d0e" : "#1e293b");
-                drawIsoTile(x, y, tileColor);
-            }
-        }
-
-        // Caisse Enregistreuse
-        drawIsoTile(CHECKOUT.x, CHECKOUT.y, "#16a34a", "#15803d");
-
-        // Ordre commun arrière -> avant pour les rayons et les personnages.
-        const drawables = [
-            ...placedBuildings.map(b => {
-                const size = GAME_CONFIG.departments[b.type].size;
-                return { depth: b.x + b.y + (size.w + size.h) / 2, draw: () => drawBuilding(b) };
-            }),
-            ...staffMembers.concat(customers).map(a => ({ depth: a.x + a.y, draw: () => drawAgent(a) }))
-        ];
-        drawables.sort((a, b) => a.depth - b.depth).forEach(item => item.draw());
-
-        requestAnimationFrame(gameLoop);
-    }
-
-    setupUI();
-    gameLoop();
-</script>
-</body>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#f6f5ee" />
+        <title>Commerce Town · La petite épicerie</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <header class="topbar">
+            <a class="brand" href="./index.html" aria-label="Commerce Town, accueil"
+                ><span class="brand-mark">ct<span>•</span></span
+                ><span
+                    >commerce<span class="brand-town">town</span
+                    ><small>LES PETITS COMMERCES FONT LES GRANDES HISTOIRES.</small></span
+                ></a
+            >
+            <div class="chapter">
+                <span class="chapter-dot"></span> La petite épicerie
+                <span class="chapter-label">PROTOTYPE JOUABLE</span>
+            </div>
+            <button class="icon-button" id="helpButton" aria-label="Comment jouer" title="Comment jouer">
+                ?
+            </button>
+        </header>
+        <div class="workspace">
+            <aside class="sidebar">
+                <div class="eyebrow">VOTRE COMMERCE, VOTRE HISTOIRE</div>
+                <h1>Bonjour,<br />commerçant<span> !</span></h1>
+                <p class="intro">Un coin de quartier.<br />Une belle aventure à faire grandir.</p>
+                <section class="wallet" aria-label="Trésorerie">
+                    <span class="wallet-icon">€</span><span class="eyebrow">DANS LA CAISSE</span>
+                    <strong id="money">480 <small>€</small></strong
+                    ><span class="wallet-note">Chaque petit commerce commence ici.</span>
+                </section>
+                <div class="metrics">
+                    <div>
+                        <span class="metric-icon">↗</span><strong id="served">0</strong
+                        ><small>clients servis</small>
+                    </div>
+                    <div>
+                        <span class="metric-icon">♧</span><strong id="variety">2 / 5</strong
+                        ><small>rayons ouverts</small>
+                    </div>
+                </div>
+                <section class="objectives">
+                    <div class="section-title">
+                        <h2>Un pas après l’autre</h2>
+                        <span>✧</span>
+                    </div>
+                    <div id="goals"></div>
+                </section>
+                <div class="sidebar-bottom">
+                    <span class="live-dot"></span
+                    ><span
+                        >Le quartier compte sur vous.<small
+                            >À votre rythme, sans course contre la montre.</small
+                        ></span
+                    >
+                </div>
+            </aside>
+            <main>
+                <section class="scene-panel" aria-label="Votre épicerie en vue isométrique">
+                    <div class="scene-heading">
+                        <div>
+                            <div class="eyebrow">LE BONHEUR EST AU COIN DE LA RUE</div>
+                            <h2>La petite épicerie<span> du quartier</span></h2>
+                        </div>
+                        <div class="open-badge">
+                            <span class="live-dot"></span><span id="openText">C’est ouvert !</span>
+                        </div>
+                    </div>
+                    <div class="scene-meta">
+                        <span id="day">JOUR 01</span
+                        ><span class="weather">☀ <span>Une belle journée pour se lancer</span></span>
+                    </div>
+                    <canvas
+                        id="gameCanvas"
+                        tabindex="0"
+                        aria-label="Magasin. Sélectionnez un rayon ci-dessous puis cliquez sur une case libre pour le construire."
+                    ></canvas>
+                    <div class="scene-bottom">
+                        <span class="scene-hint" id="sceneHint"
+                            >Votre épicerie est ouverte. Les premiers clients arrivent.</span
+                        >
+                        <div class="time-controls" aria-label="Vitesse du jeu">
+                            <button id="pauseButton" title="Pause (Espace)" aria-label="Mettre en pause">
+                                Ⅱ</button
+                            ><button data-speed="1" class="active" aria-pressed="true">1×</button
+                            ><button data-speed="2" aria-pressed="false">2×</button
+                            ><button data-speed="4" aria-pressed="false">4×</button>
+                        </div>
+                    </div>
+                    <div id="toast" role="status" aria-live="polite"></div>
+                </section>
+                <section class="build-panel" aria-label="Catalogue de construction">
+                    <div class="build-header">
+                        <div>
+                            <span class="eyebrow">FAITES GRANDIR VOTRE ÉPICERIE</span>
+                            <h2>Il y a de la place pour vos idées.</h2>
+                        </div>
+                        <button id="cancelButton" class="quiet-button">↖ Explorer <kbd>Échap</kbd></button>
+                    </div>
+                    <div id="catalog" class="catalog"></div>
+                    <div class="catalog-note">
+                        <span
+                            >✧ Mobilier fourni avec un premier stock. Réassort automatique, payé à la
+                            livraison.</span
+                        ><span id="selectionHint">Choisissez un rayon pour le placer.</span>
+                    </div>
+                </section>
+            </main>
+        </div>
+        <dialog id="helpDialog">
+            <button class="dialog-close" id="closeHelp" aria-label="Fermer">×</button>
+            <div class="eyebrow">BIENVENUE DANS LE QUARTIER</div>
+            <h2>Une petite épicerie.<br />De grandes idées.</h2>
+            <p>
+                Vos deux premiers rayons sont prêts. Les clients viennent faire leurs courses et règlent leurs
+                achats à la caisse.
+            </p>
+            <ol>
+                <li>
+                    <b>Aménagez.</b> Choisissez un rayon, puis cliquez sur une case libre. L’aperçu vert
+                    confirme que le passage reste accessible.
+                </li>
+                <li>
+                    <b>Laissez vivre.</b> Votre employé réapprovisionne les rayons. Le coût des marchandises
+                    est déduit de la caisse.
+                </li>
+                <li>
+                    <b>Grandissez.</b> Diversifiez l’offre et remplissez les objectifs pour gagner des primes.
+                </li>
+            </ol>
+            <p class="help-note">
+                Espace : pause · Échap : quitter la construction · Survolez un rayon pour consulter son
+                stock.<br />Partie locale sans sauvegarde : actualiser recommence le magasin.
+            </p>
+            <button class="primary-button" id="startButton">À moi de jouer →</button>
+        </dialog>
+        <script src="isometric.js"></script>
+        <script src="game-core.js"></script>
+        <script src="renderer.js"></script>
+        <script src="game.js"></script>
+    </body>
 </html>

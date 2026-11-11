@@ -1,5 +1,7 @@
 # État de reprise — 11 novembre 2026
 
+> Archive de l'inspection initiale. La version suivante est décrite dans `COZY-STORE.md` et le README ; ses déplacements, son rendu et son économie remplacent plusieurs limites listées ici.
+
 ## Dépôt inspecté
 
 - Dépôt : https://github.com/Kurlrip/pocket-grocery

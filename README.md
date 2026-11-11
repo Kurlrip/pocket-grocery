@@ -12,12 +12,13 @@ python -m http.server 8080
 ```
 
 - Départ avec 480 €, cinq meubles de vente, deux caisses et un employé de réassort.
-- Choisir un rayon dans le catalogue, puis une case libre. Vert : placement possible ; rouge : refusé. Un premier stock est inclus dans le prix.
+- Ouvrir **Construire**, choisir un rayon, puis toucher ou cliquer sur une case libre. Un premier stock est inclus dans le prix. **Annuler** quitte le placement.
+- Sur téléphone, glisser avec un doigt déplace la vue et pincer avec deux doigts zoome. Le catalogue et les objectifs s’ouvrent depuis le dock.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
 - L'employé réapprovisionne les rayons sous la moitié de leur capacité. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.
-- Espace : pause/reprise (hors boutons). Échap ou clic droit : quitter la construction. Boutons 1×, 2× et 4× : vitesse de simulation.
-- Survoler un rayon hors construction pour consulter son stock. Le bouton « ? » explique les règles.
+- **Commandes** donne accès à la pause, aux vitesses 1×, 2× et 4× et à l’aide. Sur PC, Espace met le jeu en pause hors boutons. Échap ferme le panneau ouvert ou quitte le placement.
+- Survoler un rayon hors construction pour consulter son stock.
 
 **Pas de sauvegarde pour cette étape : actualiser la page recommence la partie.**
 
@@ -37,7 +38,7 @@ Les tests couvrent projection/sélection, limites et chevauchements, accessibili
 ## Structure
 
 - `index.html` : interface et chargement des scripts classiques, compatible avec `file://`.
-- `style.css` : interface crème/vert sauge, disposition ordinateur/mobile.
+- `style.css` : HUD, dock illustré et panneaux adaptés au téléphone et au PC.
 - `game-core.js` : catalogue, état, recherche de chemin, placement, simulation et objectifs. Export navigateur et Node, sans DOM.
 - `renderer.js` : scène isométrique, sprites et rendu de secours dessiné en code.
 - `sprites.js` et `assets/` : planches Commerce Town originales, découpes et ancrage dans la scène.

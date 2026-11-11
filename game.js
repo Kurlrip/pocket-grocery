@@ -20,6 +20,12 @@
     const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier', controls: 'Commandes' };
     const panelButtons = [...document.querySelectorAll('[data-panel]')];
     const catalogFeedback = $('catalogFeedback');
+    for (const element of document.querySelectorAll('[data-art]')) {
+        const image = new Image();
+        image.alt = element.dataset.art === 'logo' ? 'Commerce Town' : '';
+        image.onload = () => element.replaceChildren(image);
+        image.src = `assets/ui-${element.dataset.art}.webp`;
+    }
     for (const button of panelButtons) {
         button.setAttribute('aria-expanded', 'false');
         button.setAttribute('aria-controls', panel.id);

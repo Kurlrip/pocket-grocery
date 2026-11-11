@@ -10,18 +10,18 @@
     <body>
         <main class="game">
             <header class="hud">
-                <h1 class="brand"><span>Commerce</span> <strong>Town</strong></h1>
+                <h1 class="brand" data-art="logo"><span>Commerce</span> <strong>Town</strong></h1>
                 <button class="mission" data-panel="objectives" aria-haspopup="dialog">
-                    <span class="art art-goal" aria-hidden="true">✓</span>
+                    <span class="art" data-art="goal" aria-hidden="true">✓</span>
                     <span class="mission-copy"><small>OBJECTIF</small><strong id="missionTitle"></strong></span>
                     <span id="missionProgress" class="mission-progress"></span>
                 </button>
                 <div class="counters">
                     <div class="counter" aria-label="Trésorerie">
-                        <span class="art art-coin" aria-hidden="true">€</span><strong id="money">480 €</strong>
+                        <span class="art art-coin" data-art="coin" aria-hidden="true">€</span><strong id="money">480 €</strong>
                     </div>
                     <div class="counter" aria-label="Clients servis">
-                        <span class="art art-customers" aria-hidden="true">●●</span><strong id="served">0</strong>
+                        <span class="art art-customers" data-art="customers" aria-hidden="true">●●</span><strong id="served">0</strong>
                     </div>
                 </div>
             </header>
@@ -40,13 +40,13 @@
 
             <nav class="dock" aria-label="Menu du jeu">
                 <button class="dock-button build" data-panel="construction" aria-haspopup="dialog">
-                    <span class="art art-build" aria-hidden="true">▤</span>Construire
+                    <span class="art" data-art="build" aria-hidden="true">▤</span>Construire
                 </button>
                 <button class="dock-button goals" data-panel="objectives" aria-haspopup="dialog">
-                    <span class="art art-goal" aria-hidden="true">✓</span>Objectifs
+                    <span class="art" data-art="goal" aria-hidden="true">✓</span>Objectifs
                 </button>
                 <button class="dock-button settings" data-panel="controls" aria-haspopup="dialog">
-                    <span class="art art-controls" aria-hidden="true">⚙</span>Commandes
+                    <span class="art" data-art="controls" aria-hidden="true">⚙</span>Commandes
                 </button>
             </nav>
         </main>

@@ -52,6 +52,8 @@ h1, h2, h3, p { margin: 0; }
     text-shadow: 0 2px #153754, 1px 0 #153754, -1px 0 #153754, 0 -1px #153754;
 }
 .brand strong { color: #ffc445; font-size: 1.35em; }
+[data-art] img { display: block; width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+.brand img { max-height: 100%; filter: drop-shadow(0 2px 2px #12334b80); }
 .mission {
     display: flex;
     align-items: center;
@@ -289,7 +291,7 @@ details p { margin-bottom: 9px; }
 }
 @media (max-width: 650px) {
     .hud { grid-template-columns: auto 1fr; gap: 6px 10px; }
-    .brand { height: 42px; }
+    .brand { height: 48px; }
     .counters { justify-self: end; }
     .mission { grid-row: 2; grid-column: span 2; width: min(100%, 400px); }
     .game-panel {
@@ -313,6 +315,14 @@ details p { margin-bottom: 9px; }
     .dock-button { min-height: 46px; display: flex; align-items: center; justify-content: center; }
     .dock-button .art { width: 29px; height: 29px; }
     .game-panel { bottom: calc(62px + var(--safe-bottom)); max-height: calc(100dvh - 126px - var(--safe-top) - var(--safe-bottom)); }
+}
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+    .game-panel {
+        inset: auto var(--safe-right) var(--safe-bottom) var(--safe-left);
+        margin-inline: auto;
+        max-height: calc(100dvh - 65px - var(--safe-top) - var(--safe-bottom));
+        border-radius: 20px 20px 0 0;
+    }
 }
 @media (prefers-reduced-motion: no-preference) {
     button { transition: filter .12s, transform .12s; }

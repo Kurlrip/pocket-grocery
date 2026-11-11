@@ -2,6 +2,8 @@
     'use strict';
     const TILE = 64;
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const neighborhoodBackdrop = new Image();
+    neighborhoodBackdrop.src = 'assets/commerce-neighborhood.webp';
     class StoreRenderer {
         constructor(canvas) {
             this.canvas = canvas;
@@ -15,21 +17,21 @@
         }
         resize() {
             const r = this.canvas.getBoundingClientRect(),
-                dpr = Math.max(1, devicePixelRatio || 1);
+                dpr = clamp(devicePixelRatio || 1, 1, 2);
             if (this.width !== r.width || this.height !== r.height || this.dpr !== dpr) {
                 this.width = r.width;
                 this.height = r.height;
                 this.dpr = dpr;
                 this.canvas.width = Math.round(r.width * dpr);
                 this.canvas.height = Math.round(r.height * dpr);
-                this.fitScale = Math.max(0.01, Math.min((this.width - 32) / 700, (this.height - 132) / 411));
+                this.fitScale = clamp(Math.min((this.width - 18) / 752, (this.height - 36) / 560), 0.01, 1.45);
                 this.updateCamera();
             }
         }
         updateCamera() {
             this.scale = this.fitScale * this.zoom;
-            const baseX = this.width * 0.5,
-                baseY = 105 + (this.height - 146 - 252 * this.fitScale) / 2,
+            const baseX = this.width * 0.5 + 28 * this.fitScale,
+                baseY = this.height * 0.5 - 205 * this.fitScale,
                 marginX = this.width * 0.2,
                 marginY = this.height * 0.2,
                 floorExtent = 5 * TILE * this.scale;
@@ -361,27 +363,84 @@
             this.text('FRAIS • LOCAL • DE SAISON', 0, 7, 4.8, '#d7e0bd');
             c.restore();
         }
+        drawBackdrop() {
+            const c = this.ctx;
+            const { naturalWidth, naturalHeight } = neighborhoodBackdrop;
+            if (naturalWidth && naturalHeight) {
+                const scale = Math.max(this.width / naturalWidth, this.height / naturalHeight);
+                const width = naturalWidth * scale;
+                c.drawImage(neighborhoodBackdrop, (this.width - width) / 2, 0, width, naturalHeight * scale);
+                return;
+            }
+            const sky = c.createLinearGradient(0, 0, 0, this.height);
+            sky.addColorStop(0, '#43a9e9');
+            sky.addColorStop(0.35, '#b7e2ef');
+            sky.addColorStop(0.44, '#8bb55c');
+            sky.addColorStop(1, '#739749');
+            c.fillStyle = sky;
+            c.fillRect(0, 0, this.width, this.height);
+        }
+        drawStreet() {
+            this.surface(-1.15, -1.1, 12.4, 13.1, -15, '#a8c66b', '#72984d');
+            this.box(-0.8, 10, 11.6, 1.55, -23, 12, '#f4dbc0', '#c59a7c', '#ab806c');
+            for (let x = -0.5; x < 10.8; x += 0.5)
+                this.line(this.p(x, 10, -10), this.p(x, 11.55, -10), '#b8927566');
+            this.line(this.p(-0.8, 10.76, -10), this.p(10.8, 10.76, -10), '#b8927566');
+            this.box(-0.8, 11.55, 11.6, 2.2, -27, 4, '#536575', '#384c5c', '#405361');
+            this.box(-0.8, 13.75, 11.6, 0.63, -26, 11, '#edd2b3', '#bf9b7d', '#aa8267');
+            for (let x = 0; x < 10; x += 0.85)
+                if (x < 3.6 || x > 5.2) this.surface(x, 12.59, 0.47, 0.075, -22, '#f5d06a');
+            for (let y = 11.72; y < 13.65; y += 0.34)
+                this.surface(4.04, y, 1.03, 0.17, -22, '#fff2db');
+            this.surface(4.12, 10, 0.75, 1.55, -10, '#f7e1b0');
+        }
+        drawPark() {
+            this.box(3.5, 14.38, 7.3, 3.8, -27, 9, '#9fbe60', '#729346', '#587843');
+            this.surface(4.04, 14.38, 1.03, 1.4, -17, '#ead5a8');
+            this.surface(4.04, 15.7, 5.95, 1.16, -17, '#ead5a8');
+            const fountain = this.p(7.25, 16.3, -17);
+            this.ellipse(fountain.x, fountain.y, 36, 16, '#c8b28a');
+            StoreSprites.draw(this.ctx, 'street', 'fountain', fountain.x, fountain.y, 64, { anchor: 0.82 });
+            for (const [name, x, y, width] of [
+                ['hedge', 5.7, 14.82, 79],
+                ['shrub', 5.15, 17.1, 53],
+                ['blossom', 10.32, 15.12, 96],
+                ['bench', 9.52, 16.67, 55],
+                ['tree', 10.3, 17.56, 98],
+            ]) {
+                this.sprite('furniture', name, x, y, width);
+            }
+        }
+        drawTraffic(time) {
+            const elapsed = (time + 6.7) % 18;
+            if (elapsed > 11) return;
+            const c = this.ctx,
+                p = this.p(elapsed - 0.35, 13.02, -22);
+            c.save();
+            c.globalAlpha = Math.min(1, elapsed * 2, (11 - elapsed) * 2);
+            this.ellipse(p.x, p.y + 2, 35, 10, '#14263850');
+            StoreSprites.draw(c, 'street', 'car', p.x, p.y, 78, { height: 59, anchor: 0.82 });
+            c.restore();
+        }
         render(state, hover, selected) {
             this.resize();
             const c = this.ctx;
             c.setTransform(this.canvas.width / this.width, 0, 0, this.canvas.height / this.height, 0, 0);
-            c.clearRect(0, 0, this.width, this.height);
-            const gradient = c.createRadialGradient(
-                this.width * 0.5,
-                this.height * 0.55,
-                15,
-                this.width * 0.5,
-                this.height * 0.5,
-                this.width * 0.65,
-            );
-            gradient.addColorStop(0, '#53768d');
-            gradient.addColorStop(1, '#1e3148');
-            c.fillStyle = gradient;
-            c.fillRect(0, 0, this.width, this.height);
+            this.drawBackdrop();
             c.save();
             c.translate(this.origin.x, this.origin.y);
             c.scale(this.scale, this.scale);
-            this.ellipse(6, 191, 302, 140, '#0a142b43');
+            this.ellipse(-22, 203, 345, 169, '#37492640');
+            this.drawStreet();
+            for (const [name, x, y, width] of [
+                ['tree', -0.7, 2.4, 91],
+                ['blossom', -0.75, 6.6, 83],
+                ['hedge', 4.1, -0.7, 79],
+                ['tree', 9.8, -0.6, 110],
+                ['storefront', 10.95, 0.4, 119],
+            ]) {
+                this.sprite(name === 'storefront' ? 'buildings' : 'furniture', name, x, y, width);
+            }
             this.box(0, 0, 10, 10, -15, 15, '#f9dfc4', '#c99772', '#ac7a57');
             for (let y = 0; y < 10; y++)
                 for (let x = 0; x < 10; x++) {
@@ -398,6 +457,17 @@
                 renderables.push({
                     depth: x + y + 0.25,
                     draw: () => this.person({ x: x + 0.25, y: y - 1, color: 0 }, state.time, true, true),
+                });
+            }
+            for (const [name, x, y, width] of [
+                ['planter', 3.18, 10.25, 30],
+                ['chalkboard', 5.24, 10.58, 29],
+                ['planter', 7.72, 10.47, 34],
+            ]) {
+                const p = this.p(x, y, -10);
+                renderables.push({
+                    depth: x + y + 1,
+                    draw: () => StoreSprites.draw(c, 'street', name, p.x, p.y, width),
                 });
             }
             for (const a of state.customers)
@@ -421,13 +491,21 @@
                 },
             });
             renderables.push({ depth: 21, draw: () => this.frontGlass() });
-            renderables.push({
-                depth: 22,
-                draw: () => {
-                    this.plant(0.12, 10, false);
-                    this.plant(7.54, 10, false);
-                },
-            });
+            for (const [name, x, y, width] of [
+                ['blossom', 0.05, 10.8, 76],
+                ['bench', 2.35, 10.65, 57],
+                ['lamp', 3.45, 11.21, 23],
+                ['lamp', 5.63, 11.21, 23],
+                ['shrub', 6.73, 10.62, 42],
+                ['tree', 10.5, 10.65, 105],
+            ]) {
+                renderables.push({
+                    depth: x + y + 1,
+                    draw: () => {
+                        if (!this.sprite('furniture', name, x, y, width)) this.plant(x, y);
+                    },
+                });
+            }
             if (selected && hover && hover.x >= 0 && hover.y >= 0 && hover.x < 10 && hover.y < 10) {
                 const valid = Store.placement(state, selected, hover.x, hover.y).ok,
                     d = Store.CATALOG[selected];
@@ -451,6 +529,8 @@
                 });
             }
             renderables.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
+            this.drawTraffic(state.time);
+            this.drawPark();
             if (!selected && hover) {
                 const b = state.buildings.find(
                     (b) =>

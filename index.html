@@ -75,6 +75,10 @@
                         <span id="day">JOUR 01</span
                         ><span class="weather">☀ <span>Une belle journée pour se lancer</span></span>
                     </div>
+                    <figure class="storefront" hidden>
+                        <canvas id="storefrontCanvas" width="300" height="220" aria-hidden="true"></canvas>
+                        <figcaption>VU DEPUIS LA RUE</figcaption>
+                    </figure>
                     <canvas
                         id="gameCanvas"
                         tabindex="0"
@@ -141,6 +145,7 @@
         </dialog>
         <script src="isometric.js"></script>
         <script src="game-core.js"></script>
+        <script src="sprites.js"></script>
         <script src="renderer.js"></script>
         <script src="game.js"></script>
     </body>

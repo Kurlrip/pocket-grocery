@@ -37,6 +37,22 @@
         $('catalog').appendChild(button);
         StoreRenderer.thumbnail(button.querySelector('canvas'), type);
     }
+    StoreSprites.ready.then(() => {
+        document
+            .querySelectorAll('.catalog-card')
+            .forEach((button) =>
+                StoreRenderer.thumbnail(button.querySelector('canvas'), button.dataset.type),
+            );
+        const facade = $('storefrontCanvas');
+        facade.parentElement.hidden = !StoreSprites.draw(
+            facade.getContext('2d'),
+            'buildings',
+            'storefront',
+            150,
+            196,
+            276,
+        );
+    });
     function updateUI() {
         $('money').innerHTML = `${moneyFormat.format(state.money)} <small>€</small>`;
         $('served').textContent = state.served;

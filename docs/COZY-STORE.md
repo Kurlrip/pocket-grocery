@@ -1,5 +1,7 @@
 # La petite épicerie — 11 novembre 2026
 
+> Cette note décrit la version procédurale initiale. Voir `COMMERCE-TOWN-ART.md` pour la direction graphique actuelle.
+
 ## Direction retenue
 
 L'utilisateur autorise une reprise complète et indique ne plus vouloir dépendre des anciennes images. À l'inspection, le dépôt local est propre et contient encore la planche d'origine. Elle est conservée, sans être chargée.

@@ -84,7 +84,23 @@
         shadow(x, y, w, h) {
             this.surface(x + 0.12, y + 0.12, w + 0.05, h + 0.12, 0.2, '#354a3422');
         }
+        sprite(sheet, name, x, y, width, options) {
+            const p = this.p(x, y);
+            return StoreSprites.draw(this.ctx, sheet, name, p.x, p.y, width, options);
+        }
+        texturedTile(name, x, y, z, opacity) {
+            const p = this.p(x + 0.5, y + 0.5, z),
+                c = this.ctx;
+            c.save();
+            this.surface(x, y, 1, 1, z);
+            c.clip();
+            c.globalAlpha = opacity;
+            StoreSprites.draw(c, 'furniture', name, p.x, p.y, TILE + 3, { height: 35, anchor: 0.5 });
+            c.restore();
+        }
         plant(x, y, big = false) {
+            if (this.sprite('furniture', big ? 'blossom' : 'shrub', x + 0.24, y + 0.24, big ? 65 : 31))
+                return;
             const p = this.p(x + 0.25, y + 0.25, 0);
             this.ellipse(p.x, p.y + 4, big ? 24 : 12, big ? 11 : 6, '#40533818');
             this.box(x, y, 0.48, 0.48, 0, big ? 20 : 13, '#b6ad90', '#978f75', '#a59e80');
@@ -104,6 +120,7 @@
             this.ellipse(center.x - 6, center.y - 8, big ? 14 : 7, big ? 12 : 6, '#a6ba83');
         }
         tree(x, y) {
+            if (this.sprite('furniture', 'tree', x, y, 93)) return;
             const p = this.p(x, y);
             this.ellipse(p.x + 7, p.y + 7, 40, 19, '#6477471c');
             this.box(x - 0.08, y - 0.08, 0.16, 0.16, 0, 66, '#93876a', '#8a7e61', '#7e7459');
@@ -126,6 +143,10 @@
                 W = w - 0.18,
                 H = h - 0.18;
             if (!preview) this.shadow(x, y, W, H);
+            if (
+                this.sprite('furniture', b.type, b.x + w / 2, b.y + h / 2, w === 1 ? 52 : 94, { flip: w > 1 })
+            )
+                return;
             if (b.type === 'produce') {
                 this.box(x + 0.05, y + 0.04, W - 0.1, H - 0.08, 0, 8, '#a07e51', '#88683f', '#765939');
                 this.box(x, y, W, H, 8, 20, '#bfa16f', '#aa895c', '#93764d');
@@ -229,6 +250,7 @@
         }
         counter() {
             this.shadow(1.05, 7.05, 1.9, 0.85);
+            if (this.sprite('furniture', 'counter', 2, 7.5, 92, { flip: true })) return;
             this.box(1.05, 7.05, 1.9, 0.85, 0, 28, '#bed0ad', '#547d62', '#41684f');
             this.box(1.01, 7.01, 1.98, 0.93, 28, 4, '#d4bd90', '#b9a37a', '#a58d67');
             this.box(1.17, 7.2, 0.7, 0.53, 32, 2, '#829184', '#647e6d', '#637766');
@@ -259,6 +281,22 @@
         person(a, time, staff = false, cashier = false) {
             const p = this.p(a.x + 0.5, a.y + 0.5),
                 c = this.ctx;
+            const next = a.route?.[0];
+            const bob = next ? Math.abs(Math.sin(time * 10 + (a.color || 0))) * 2 : 0;
+            const name = cashier ? 'cashier' : staff ? 'employee' : `shopper${(a.color || 0) % 4}`;
+            if (
+                StoreSprites.draw(c, 'people', name, p.x, p.y - bob, 29, {
+                    height: 44,
+                    anchor: 0.94,
+                    flip: !!next && next.x - a.x < next.y - a.y,
+                })
+            ) {
+                if ((a.state === 'refill' && !next) || cashier) {
+                    this.ellipse(p.x, p.y - 47, 8, 6, '#fff9e4');
+                    this.text(cashier ? '€' : '↻', p.x, p.y - 44, 8, '#2d6f6a');
+                }
+                return;
+            }
             const walk = a.route?.length ? Math.sin(time * 11 + a.color) * 2 : 0;
             this.ellipse(p.x, p.y, 8, 3.8, '#4b53352b');
             const shirt = staff
@@ -314,7 +352,7 @@
             c.save();
             c.translate(p.x, p.y);
             c.transform(1, -0.5, 0, 1, 0, 0);
-            c.fillStyle = '#4e765b';
+            c.fillStyle = '#b83836';
             c.fillRect(-61, -19, 122, 36);
             this.text('LA PETITE ÉPICERIE', 0, -4, 9, '#f6edcf', 'Georgia');
             this.text('FRAIS • LOCAL • DE SAISON', 0, 7, 4.8, '#d7e0bd');
@@ -323,14 +361,23 @@
         environment(time) {
             const c = this.ctx;
             this.ellipse(7, 200, 360, 135, '#7c8e6220');
-            this.box(-1.7, -1.7, 13.4, 13.4, -22, 18, '#cbd7ae', '#b5c39b', '#a8ba90');
+            this.box(-1.7, -1.7, 13.4, 13.4, -22, 18, '#a7c65b', '#82a445', '#688c3c');
+            for (let i = -1; i <= 10; i++) {
+                this.texturedTile('grass', i, -1.65, -3.8, 0.95);
+                this.texturedTile('grass', i, 10.65, -3.8, 0.95);
+                this.texturedTile('grass', -1.65, i, -3.8, 0.95);
+                this.texturedTile('grass', 10.65, i, -3.8, 0.95);
+            }
             // A paved lane around the store; individually shaded slabs keep the miniature scale.
             for (let y = -1; y < 11; y++)
                 for (let x = -1; x < 11; x++)
-                    if (x < 0 || y < 0 || x === 10 || y === 10)
+                    if (x < 0 || y < 0 || x === 10 || y === 10) {
                         this.surface(x, y, 0.98, 0.98, -3, (x + y) % 2 ? '#dedbc8' : '#e4dfce', '#c7c7ae55');
+                        this.texturedTile('paving', x, y, -2.9, 1);
+                    }
             this.tree(-1.1, 1.4);
             this.tree(9.5, -1.1);
+            this.plant(-1.3, 6.6, true);
             // Small entrance welcome mat.
             this.surface(3.9, 10.05, 1.3, 0.85, 1, '#8c9d78');
             const p = this.p(4.55, 10.5, 2);
@@ -361,8 +408,8 @@
                 this.height * 0.5,
                 this.width * 0.65,
             );
-            gradient.addColorStop(0, '#f4f4e7');
-            gradient.addColorStop(1, '#e9efdf');
+            gradient.addColorStop(0, '#f3faff');
+            gradient.addColorStop(1, '#d8ebf8');
             c.fillStyle = gradient;
             c.fillRect(0, 0, this.width, this.height);
             c.save();
@@ -371,8 +418,10 @@
             this.environment(state.time);
             this.box(0, 0, 10, 10, -12, 12, '#efead8', '#c5bda3', '#b1af94');
             for (let y = 0; y < 10; y++)
-                for (let x = 0; x < 10; x++)
+                for (let x = 0; x < 10; x++) {
                     this.surface(x, y, 0.997, 0.997, 0.1, (x + y) % 2 ? '#e8e1cb' : '#f0ead7', '#d4cdb544');
+                    this.texturedTile('paving', x, y, 0.15, 0.4);
+                }
             this.walls();
             const renderables = state.buildings.map((b) => ({
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
@@ -396,7 +445,6 @@
             ])
                 renderables.push({ depth: x + y + 1, draw: () => this.plant(x, y) });
             for (const [x, y, big] of [
-                [-1.3, 6.6, true],
                 [10.45, 2, true],
                 [1.7, 10.5, false],
                 [7.4, 10.5, false],
@@ -404,11 +452,14 @@
                 renderables.push({ depth: x + y + 1, draw: () => this.plant(x, y, big) });
             renderables.push({
                 depth: 16.4,
-                draw: () => this.box(10.45, 5, 0.35, 1.65, -2, 13, '#94ad73', '#7d9860', '#718c56'),
+                draw: () =>
+                    this.sprite('furniture', 'hedge', 10.55, 5.65, 72) ||
+                    this.box(10.45, 5, 0.35, 1.65, -2, 13, '#94ad73', '#7d9860', '#718c56'),
             });
             renderables.push({
                 depth: 18.5,
                 draw: () => {
+                    if (this.sprite('furniture', 'bench', 10.5, 7.9, 60)) return;
                     this.box(10.28, 7.3, 0.54, 1.3, 0, 12, '#c6ac7a', '#af9567', '#a08760');
                     this.box(10.72, 7.3, 0.12, 1.3, 12, 16, '#c6ac7a', '#b29a6c', '#9b855c');
                 },
@@ -417,10 +468,12 @@
             renderables.push({
                 depth: 9.8,
                 draw: () => {
+                    if (this.sprite('furniture', 'stock', 9.3, 0.65, 48)) return;
                     this.box(9, 0.3, 0.7, 0.65, 0, 18, '#c6ad7e', '#b29a6e', '#a48c60');
                     this.box(9, 0.35, 0.62, 0.52, 18, 15, '#d8c397', '#bfa775', '#ae9667');
                 },
             });
+            renderables.push({ depth: 15.5, draw: () => this.sprite('furniture', 'lamp', 5.1, 10.5, 25) });
             if (selected && hover && hover.x >= 0 && hover.y >= 0 && hover.x < 10 && hover.y < 10) {
                 const valid = Store.placement(state, selected, hover.x, hover.y).ok,
                     d = Store.CATALOG[selected];

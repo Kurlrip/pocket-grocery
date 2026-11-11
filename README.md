@@ -1,6 +1,6 @@
 # Commerce Town · La petite épicerie
 
-Prototype jouable de gestion d'épicerie, en HTML/Canvas et JavaScript. Diorama isométrique dessiné en code : aucun asset graphique, service distant ou paquet npm nécessaire pour jouer. L'ancien prototype Pocket Grocery reste disponible dans l'historique Git.
+Prototype jouable de gestion d'épicerie, en HTML/Canvas et JavaScript. Le diorama utilise les planches Commerce Town fournies : mobilier, personnages, végétation et façade. Aucun service distant ni paquet npm nécessaire pour jouer.
 
 ## Jouer
 
@@ -39,7 +39,8 @@ Les tests couvrent projection/sélection, limites et chevauchements, accessibili
 - `index.html` : interface et chargement des scripts classiques, compatible avec `file://`.
 - `style.css` : interface crème/vert sauge, disposition ordinateur/mobile.
 - `game-core.js` : catalogue, état, recherche de chemin, placement, simulation et objectifs. Export navigateur et Node, sans DOM.
-- `renderer.js` : diorama, mobilier, personnages et vignettes procédurales.
+- `renderer.js` : scène isométrique, sprites et rendu de secours dessiné en code.
+- `sprites.js` et `assets/` : planches Commerce Town originales, découpes et ancrage dans la scène.
 - `game.js` : interactions, affichage des indicateurs et boucle à pas fixe de 1/30 s.
 - `isometric.js` : projection et sélection réutilisées depuis le prototype initial.
 - `tests/` : tests Node intégrés.

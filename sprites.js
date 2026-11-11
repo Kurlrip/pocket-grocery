@@ -19,6 +19,14 @@
             paving: [512, 16, 232, 133],
             grass: [25, 20, 237, 129],
         },
+        'furniture-hd-v2': {
+            bakery: [4, 4, 426, 311],
+            grocery: [438, 4, 424, 343],
+            dairy: [870, 4, 410, 336],
+            counter: [4, 420, 462, 271],
+            produce: [474, 420, 508, 355],
+            flowers: [990, 420, 272, 234],
+        },
         people: {
             shopper0: [42, 21, 152, 249],
             shopper1: [214, 27, 145, 245],
@@ -27,7 +35,6 @@
             cashier: [747, 23, 147, 245],
             employee: [914, 20, 146, 250],
         },
-        buildings: { storefront: [29, 81, 278, 221] },
         street: {
             fountain: [12, 12, 195, 232],
             car: [268, 12, 232, 202],
@@ -43,6 +50,17 @@
         grocery: [0.24, -0.56],
         counter: [0.23, -0.52],
     };
+    const hdFurnitureLayout = {
+        bakery: { slopes: [0.26, -0.56], anchor: 0.776 },
+        grocery: { slopes: [0.24, -0.63], anchor: 0.806 },
+        counter: { slopes: [0.2, -0.68], anchor: 0.752 },
+        produce: { slopes: [0.24, -0.46], anchor: 0.791 },
+        dairy: { slopes: [0.18, -0.52], anchor: 0.847 },
+        flowers: { anchor: 0.667 },
+    };
+    function hdFurnitureFrame(name) {
+        return images['furniture-hd-v2'] && frames['furniture-hd-v2'][name];
+    }
     const ready = Promise.all(
         Object.keys(frames).map(
             (name) =>
@@ -53,19 +71,22 @@
                         resolve();
                     };
                     image.onerror = resolve;
-                    image.src = `assets/commerce-${name}.${name === 'street' ? 'webp' : 'png'}`;
+                    const extension = name === 'furniture' || name === 'people' ? 'png' : 'webp';
+                    image.src = `assets/commerce-${name}.${extension}`;
                 }),
         ),
     );
     function draw(ctx, sheet, name, x, y, width, { anchor = 0.9, height, flip = false, floorSlope } = {}) {
-        const image = images[sheet],
-            frame = frames[sheet][name];
+        const hd = sheet === 'furniture' && hdFurnitureFrame(name);
+        const image = hd ? images['furniture-hd-v2'] : images[sheet],
+            frame = hd || frames[sheet][name];
         if (!image || !frame) return false;
         const [, , w, h] = frame;
         height ??= (width * h) / w;
         ctx.save();
         ctx.translate(x, y);
-        const slopes = sheet === 'furniture' && flip && furnitureSlopes[name];
+        const layout = hd && hdFurnitureLayout[name];
+        const slopes = sheet === 'furniture' && flip && (layout ? layout.slopes : furnitureSlopes[name]);
         if (slopes && floorSlope) {
             const [front, side] = slopes;
             const verticalScale = (2 * floorSlope) / (front - side);
@@ -75,9 +96,9 @@
         }
         if (flip) ctx.scale(-1, 1);
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(image, ...frame, -width / 2, -height * anchor, width, height);
+        ctx.drawImage(image, ...frame, -width / 2, -height * (layout?.anchor ?? anchor), width, height);
         ctx.restore();
         return true;
     }
-    globalThis.StoreSprites = { ready, draw };
+    globalThis.StoreSprites = { ready, draw, hasHDFurniture: (name) => Boolean(hdFurnitureFrame(name)) };
 })();

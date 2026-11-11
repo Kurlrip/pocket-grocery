@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('../game-core.js');
-function run(s, seconds) {
-    for (let i = 0; i < seconds * 30; i++) S.step(s, 1 / 30);
+function run(s, seconds, onStockChange) {
+    for (let i = 0; i < seconds * 30; i++) S.step(s, 1 / 30, onStockChange);
 }
 
 test('routes use cardinal, walkable cells and avoid the initial furniture', () => {
@@ -59,7 +59,51 @@ test('customers buy, pay, leave, and staff pay for replacement stock', () => {
     const rewards = S.GOALS.reduce((n, g, i) => n + (s.completed[i] ? g.reward : 0), 0);
     assert.equal(s.money, 480 + s.revenue - s.supplySpent + rewards);
     assert.ok(s.customers.length <= 9);
+    assert.equal(Object.values(s.demand).reduce((total, demand) => total + demand.sold, 0), s.served);
+    assert.equal(Object.entries(s.demand).reduce((total, [type, demand]) => total + demand.sold * S.CATALOG[type].price, 0), s.revenue);
     for (const b of s.buildings) assert.ok(b.stock >= 0 && b.stock <= S.CATALOG[b.type].capacity);
+});
+
+test('an absent product misses sales until its shelf is opened', () => {
+    const s = S.create();
+    run(s, 10);
+    const missed = s.demand.flowers.missed;
+    assert.ok(missed > 0);
+    assert.equal(s.demand.flowers.sold, 0);
+    assert.equal(S.place(s, 'flowers', 5, 7).ok, true);
+    run(s, 35);
+    assert.equal(s.demand.flowers.missed, missed);
+    assert.ok(s.demand.flowers.sold > 0);
+});
+
+test('a customer finds a second shelf of the same type if the first sells out', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 6).ok, true);
+    run(s, 2);
+    const customer = s.customers.find((a) => a.request === 'produce');
+    const target = s.buildings.find((b) => b.id === customer.target);
+    const alternative = s.buildings.find((b) => b.type === 'produce' && b !== target);
+    s.spawnTimer = Infinity;
+    s.money = 0;
+    target.stock = 0;
+    run(s, 18);
+    assert.equal(s.demand.produce.missed, 0);
+    assert.equal(s.demand.produce.sold, 1);
+    assert.equal(alternative.stock, S.CATALOG.produce.capacity - 1);
+});
+
+test('a shelf running out during the trip records one miss and no sale', () => {
+    const s = S.create();
+    run(s, 2);
+    const customer = s.customers.find((a) => a.request === 'produce');
+    s.buildings.find((b) => b.id === customer.target).stock = 0;
+    s.spawnTimer = Infinity;
+    s.money = 0;
+    run(s, 20);
+    assert.deepEqual(s.demand.produce, { sold: 0, missed: 1 });
+    assert.equal(s.served, 0);
+    assert.equal(s.money, 0);
+    assert.equal(s.customers.length, 0);
 });
 
 test('agents never occupy furniture or move diagonally through it', () => {
@@ -84,6 +128,19 @@ test('an empty shop restocks itself and does not spend beyond available funds', 
     assert.ok(s.money >= 0);
 });
 
+test('stock changes report the exact units taken and restocked', () => {
+    const s = S.create();
+    const events = [];
+    const record = (shelf, before) => events.push([shelf.type, before, shelf.stock]);
+    s.buildings[0].stock = 8;
+    s.spawnTimer = Infinity;
+    run(s, 22, record);
+    assert.deepEqual(events, [['produce', 8, 20]]);
+    s.spawnTimer = 0;
+    run(s, 9, record);
+    assert.deepEqual(events[1], ['produce', 20, 19]);
+});
+
 test('building during active routes re-plans without stranding customers', () => {
     const s = S.create();
     run(s, 4);
@@ -93,6 +150,57 @@ test('building during active routes re-plans without stranding customers', () =>
     for (const a of [...s.customers, s.staff]) for (const p of a.route) assert.equal(grid[p.y][p.x], 0);
     run(s, 90);
     assert.ok(s.served > 10);
+});
+
+test('rotated shelves swap their footprint without losing stock or charging again', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 7, true).ok, true);
+    const shelf = s.buildings.at(-1);
+    assert.equal(S.shelfAt(s.buildings, 5, 8), shelf);
+    assert.notEqual(S.shelfAt(s.buildings, 6, 7), shelf);
+    const before = JSON.stringify(s);
+    assert.equal(S.rotate(s, shelf.id).ok, false);
+    assert.equal(JSON.stringify(s), before);
+    const existing = s.buildings[0];
+    const money = s.money, stock = existing.stock;
+    assert.equal(S.rotate(s, existing.id).ok, true);
+    assert.equal(S.gridFor(s.buildings)[4][3], existing.id);
+    assert.equal(S.gridFor(s.buildings)[3][4], 0);
+    assert.equal(existing.stock, stock);
+    assert.equal(s.money, money);
+});
+
+test('removing a shelf redirects a shopper and an employee without refunding the shelf', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 6).ok, true);
+    const shelf = s.buildings.at(-1);
+    shelf.stock = 1;
+    run(s, 2);
+    const shopper = s.customers.find((a) => a.target === shelf.id);
+    assert.ok(shopper);
+    assert.equal(s.staff.target, shelf.id);
+    const money = s.money;
+    assert.equal(S.remove(s, shelf.id), true);
+    assert.equal(s.money, money);
+    assert.equal(s.staff.state, 'return');
+    assert.equal(shopper.target, 1);
+    assert.equal(S.remove(s, shelf.id), false);
+    run(s, 20);
+    assert.ok(s.demand.produce.sold > 0);
+});
+
+test('rotation preserves the current movement segment and leads to a valid shelf access', () => {
+    const s = S.create();
+    run(s, 2);
+    const shopper = s.customers.find((a) => a.request === 'produce');
+    const shelf = s.buildings.find((b) => b.id === shopper.target);
+    const next = shopper.route[0];
+    assert.equal(S.rotate(s, shelf.id).ok, true);
+    assert.deepEqual(shopper.route[0], next);
+    assert.ok(S.serviceCells(shelf, S.gridFor(s.buildings)).some((cell) =>
+        cell.x === shopper.route.at(-1).x && cell.y === shopper.route.at(-1).y));
+    run(s, 15);
+    assert.ok(s.demand.produce.sold > 0);
 });
 
 test('the same fixed steps reproduce the same economy and agents', () => {

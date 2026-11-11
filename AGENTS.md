@@ -10,5 +10,5 @@
 - Toute construction doit préserver les trajets et l'accès à la caisse, à la réserve et à chaque rayon. Les primes doivent être versées une seule fois.
 - Conserver les planches approuvées dans `assets/`. `sprites.js` définit les découpes sans modifier les fichiers PNG ; `renderer.js` garde un rendu de secours. L'ancienne `spritesheet.png` n'est plus chargée.
 - Travailler sur une branche distincte ; ne pas fusionner ou déployer sans demande.
-- Pas de sauvegarde, rotation, destruction de mobilier ou file d'attente physique. La simulation ignore les collisions entre agents, mais contourne le mobilier.
+- `save-game.js` : sauvegarde locale versionnée et reprise des trajets. Pas de file d’attente physique. La simulation ignore les collisions entre agents, mais contourne le mobilier.
 - L'historique `docs/PROJECT-STATE.md` décrit l'inspection initiale. Lire `docs/COZY-STORE.md` pour la simulation et `docs/COMMERCE-TOWN-ART.md` pour les sprites actuels.

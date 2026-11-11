@@ -61,6 +61,7 @@
             size: { w: 1, h: 1 },
         },
     };
+    const productTypes = Object.keys(CATALOG);
     const GOALS = [
         {
             title: 'Les premiers habitués',
@@ -88,12 +89,22 @@
     const same = (a, b) => a.x === b.x && a.y === b.y;
     const inside = (p) =>
         Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < SIZE && p.y < SIZE;
+    function sizeOf({ type, rotated }) {
+        const { w, h } = CATALOG[type].size;
+        return rotated ? { w: h, h: w } : { w, h };
+    }
+    function shelfAt(buildings, x, y) {
+        return buildings.find((b) => {
+            const { w, h } = sizeOf(b);
+            return x >= b.x && x < b.x + w && y >= b.y && y < b.y + h;
+        });
+    }
     function gridFor(buildings) {
         const grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
         // Counter and the cashier's standing position.
         for (const { x, y } of COUNTERS) grid[y][x] = grid[y][x + 1] = grid[y - 1][x] = -1;
         for (const b of buildings) {
-            const size = CATALOG[b.type].size;
+            const size = sizeOf(b);
             for (let y = b.y; y < b.y + size.h; y++)
                 for (let x = b.x; x < b.x + size.w; x++) grid[y][x] = b.id;
         }
@@ -128,7 +139,7 @@
         return route;
     }
     function serviceCells(b, grid) {
-        const { w, h } = CATALOG[b.type].size;
+        const { w, h } = sizeOf(b);
         const points = [];
         for (let x = b.x; x < b.x + w; x++) points.push({ x, y: b.y + h }, { x, y: b.y - 1 });
         for (let y = b.y; y < b.y + h; y++) points.push({ x: b.x - 1, y }, { x: b.x + w, y });
@@ -148,6 +159,7 @@
             served: 0,
             revenue: 0,
             supplySpent: 0,
+            demand: Object.fromEntries(productTypes.map((type) => [type, { sold: 0, missed: 0 }])),
             time: 0,
             spawnTimer: 1,
             nextId: 6,
@@ -174,14 +186,21 @@
         s.events.push({ text, kind });
         if (s.events.length > 8) s.events.shift();
     }
-    function placement(s, type, x, y) {
+    function placement(s, type, x, y, rotated = false) {
         const config = CATALOG[type];
         if (!config || !Number.isInteger(x) || !Number.isInteger(y))
             return { ok: false, reason: 'Choisissez une case dans le magasin.' };
         if (s.money < config.cost)
             return { ok: false, reason: 'Quelques ventes de plus et ce rayon sera à vous.' };
-        const grid = gridFor(s.buildings),
-            size = config.size;
+        return validateLayout(s, { id: s.nextId, type, x, y, ...(rotated && { rotated: true }) });
+    }
+    function headedToShelf(agent, id) {
+        return agent.target === id && (agent.state === 'shopping' || agent.state === 'refill');
+    }
+    function validateLayout(s, candidate, replace = false) {
+        const { x, y, id } = candidate;
+        const buildings = replace ? s.buildings.filter((b) => b.id !== id) : s.buildings;
+        const grid = gridFor(buildings), size = sizeOf(candidate);
         if (x < 0 || y < 0 || x + size.w > SIZE || y + size.h > SIZE)
             return { ok: false, reason: 'Le rayon doit rester dans le magasin.' };
         const protectedCells = [ENTRANCE, ...CHECKOUTS, DEPOT];
@@ -196,14 +215,14 @@
             for (let ix = x; ix < x + size.w; ix++) {
                 if (grid[iy][ix] !== 0 || protectedCells.some((p) => p.x === ix && p.y === iy))
                     return { ok: false, reason: 'Cette case est occupée. Gardez les passages libres.' };
-                grid[iy][ix] = s.nextId;
+                grid[iy][ix] = id;
             }
-        const candidate = { id: s.nextId, type, x, y },
-            all = [...s.buildings, candidate];
+        const all = [...buildings, candidate];
         const connected = reachable(grid, ENTRANCE);
         const targets = [...CHECKOUTS, DEPOT];
         for (const a of [...s.customers, s.staff]) {
-            targets.push(a.route.at(-1) || { x: Math.round(a.x), y: Math.round(a.y) });
+            if (!replace || !headedToShelf(a, id) || !a.route.length)
+                targets.push(a.route.at(-1) || { x: Math.round(a.x), y: Math.round(a.y) });
             if (a.route[0]) targets.push(a.route[0]);
         }
         if (
@@ -214,22 +233,63 @@
         }
         return { ok: true, grid, candidate };
     }
-    function place(s, type, x, y) {
-        const result = placement(s, type, x, y);
+    function place(s, type, x, y, rotated = false) {
+        const result = placement(s, type, x, y, rotated);
         if (!result.ok) return result;
         s.money -= CATALOG[type].cost;
         s.buildings.push({ ...result.candidate, stock: CATALOG[type].capacity });
         s.nextId++;
-        // Preserve the current movement segment, then rebuild the remaining route.
-        for (const a of [...s.customers, s.staff])
-            if (a.route.length) {
-                const first = a.route[0],
-                    last = a.route.at(-1);
-                a.route = [first, ...path(result.grid, first, last)];
-            }
+        updateRoutes(s, result.grid);
         notify(s, `${CATALOG[type].name} a ouvert ses portes.`, 'success');
         checkGoals(s);
         return { ok: true };
+    }
+    function updateRoutes(s, grid, changedId) {
+        // Start at the next cell so an agent already moving keeps its current segment.
+        for (const a of [...s.customers, s.staff]) {
+            const first = a.route[0], from = first || { x: a.x, y: a.y };
+            let route;
+            if (changedId !== undefined && headedToShelf(a, changedId)) {
+                if (a === s.staff) {
+                    const shelf = s.buildings.find((b) => b.id === changedId);
+                    route = shelf && nearestRoute(grid, from, serviceCells(shelf, grid));
+                    if (route) a.timer = 2;
+                    else {
+                        a.state = 'return';
+                        a.target = null;
+                        route = path(grid, from, DEPOT);
+                    }
+                } else {
+                    const shelf = findStockedShelf(s.buildings, grid, from, a.request);
+                    if (shelf) {
+                        a.target = shelf.id;
+                        a.timer = 0.9;
+                        route = shelf.route;
+                    } else {
+                        leaveShop(s, grid, a, from, true);
+                        route = a.route;
+                    }
+                }
+            } else if (first) route = path(grid, from, a.route.at(-1));
+            if (route) a.route = first ? [first, ...route] : route;
+        }
+    }
+    function rotate(s, id) {
+        const shelf = s.buildings.find((b) => b.id === id);
+        if (!shelf) return { ok: false, reason: 'Ce rayon a déjà été retiré.' };
+        const candidate = { ...shelf, rotated: !shelf.rotated };
+        const result = validateLayout(s, candidate, true);
+        if (!result.ok) return result;
+        shelf.rotated = candidate.rotated;
+        updateRoutes(s, result.grid, id);
+        return { ok: true };
+    }
+    function remove(s, id) {
+        const index = s.buildings.findIndex((b) => b.id === id);
+        if (index === -1) return false;
+        s.buildings.splice(index, 1);
+        updateRoutes(s, gridFor(s.buildings), id);
+        return true;
     }
     function move(a, dt, speed) {
         let budget = dt * speed;
@@ -259,28 +319,45 @@
             }
         });
     }
-    function step(s, dt) {
+    function findStockedShelf(buildings, grid, from, type) {
+        let best = null;
+        for (const b of buildings) {
+            if (b.type !== type || b.stock <= 0) continue;
+            const route = nearestRoute(grid, from, serviceCells(b, grid));
+            if (route && (!best || route.length < best.route.length)) best = { id: b.id, route };
+        }
+        return best;
+    }
+    function leaveShop(s, grid, a, from, missed = false) {
+        if (missed) s.demand[a.request].missed++;
+        a.unserved = missed;
+        a.value = 0;
+        a.state = 'leaving';
+        a.timer = missed ? 0.8 : 0;
+        a.route = path(grid, from, ENTRANCE) || [];
+    }
+    function step(s, dt, onStockChange) {
         if (!Number.isFinite(dt) || dt <= 0) return;
         s.time += dt;
         s.spawnTimer -= dt;
         const grid = gridFor(s.buildings);
         if (s.spawnTimer <= 0) {
             s.spawnTimer = 3.5;
-            const stocked = s.buildings.filter((b) => b.stock > 0);
-            if (s.customers.length < 9 && stocked.length) {
-                const b = stocked[Math.floor(random(s) * stocked.length)];
-                const route = nearestRoute(grid, ENTRANCE, serviceCells(b, grid));
-                if (route)
-                    s.customers.push({
-                        x: ENTRANCE.x,
-                        y: ENTRANCE.y,
-                        route,
-                        state: 'shopping',
-                        target: b.id,
-                        timer: 0.9,
-                        value: 0,
-                        color: Math.floor(random(s) * 5),
-                    });
+            if (s.customers.length < 9) {
+                const request = productTypes[Math.floor(random(s) * productTypes.length)];
+                const shelf = findStockedShelf(s.buildings, grid, ENTRANCE, request);
+                const customer = {
+                    ...ENTRANCE,
+                    request,
+                    route: shelf?.route ?? [],
+                    state: 'shopping',
+                    target: shelf?.id ?? null,
+                    timer: 0.9,
+                    value: 0,
+                    color: Math.floor(random(s) * 5),
+                };
+                if (!shelf) leaveShop(s, grid, customer, ENTRANCE, true);
+                s.customers.push(customer);
             }
         }
         for (const a of s.customers) {
@@ -290,23 +367,27 @@
             const from = { x: a.x, y: a.y };
             if (a.state === 'shopping') {
                 const b = s.buildings.find((b) => b.id === a.target);
-                if (b?.stock > 0) {
-                    b.stock--;
-                    a.value = CATALOG[b.type].price;
+                if (!b || b.stock <= 0) {
+                    const alternative = findStockedShelf(s.buildings, grid, from, a.request);
+                    if (alternative) {
+                        a.target = alternative.id;
+                        a.route = alternative.route;
+                        a.timer = 0.9;
+                    } else leaveShop(s, grid, a, from, true);
+                    continue;
                 }
+                b.stock--;
+                onStockChange?.(b, b.stock + 1);
+                a.value = CATALOG[a.request].price;
                 a.state = 'checkout';
                 a.timer = 1.1;
                 a.route = nearestRoute(grid, from, CHECKOUTS) || [];
             } else if (a.state === 'checkout') {
-                if (a.value > 0) {
-                    s.money += a.value;
-                    s.revenue += a.value;
-                    s.served++;
-                }
-                a.value = 0;
-                a.state = 'leaving';
-                a.timer = 0;
-                a.route = path(grid, from, ENTRANCE) || [];
+                s.money += a.value;
+                s.revenue += a.value;
+                s.served++;
+                s.demand[a.request].sold++;
+                leaveShop(s, grid, a, from);
             } else a.state = 'done';
         }
         s.customers = s.customers.filter((a) => a.state !== 'done');
@@ -332,6 +413,7 @@
                         config = CATALOG[b.type];
                     const units = Math.min(config.capacity - b.stock, Math.floor(s.money / config.supply));
                     b.stock += units;
+                    if (units) onStockChange?.(b, b.stock - units);
                     s.money -= units * config.supply;
                     s.supplySpent += units * config.supply;
                     a.state = 'return';
@@ -354,10 +436,14 @@
         GOALS,
         create,
         gridFor,
+        sizeOf,
+        shelfAt,
         path,
         serviceCells,
         placement,
         place,
+        rotate,
+        remove,
         step,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -12,15 +12,17 @@ python -m http.server 8080
 ```
 
 - Départ avec 480 €, cinq meubles de vente, deux caisses et un employé de réassort.
-- Ouvrir **Construire**, choisir un rayon, puis toucher ou cliquer sur une case libre. Un premier stock est inclus dans le prix. **Annuler** quitte le placement.
+- Ouvrir **Construire** et choisir un rayon. Sur téléphone, toucher une case pour afficher l’aperçu, puis appuyer sur **Poser**. Sur PC, survoler une case pour prévisualiser et cliquer pour construire. **Tourner** change l’orientation du rayon avant la pose.
+- Hors construction, sélectionner un rayon par sa base pour le tourner sur place ou le retirer. Le retrait est confirmé et ne rembourse pas l’achat.
 - Sur téléphone, glisser avec un doigt déplace la vue et pincer avec deux doigts zoome. Le catalogue et les objectifs s’ouvrent depuis le dock.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
-- L'employé réapprovisionne les rayons sous la moitié de leur capacité. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
+- Chaque client cherche un type de produit. Le catalogue indique le stock, les ventes et les demandes manquées par rayon depuis le début de la partie. Une suggestion apparaît quand un produit demandé reste indisponible.
+- Chaque rayon a une jauge au-dessus du meuble. Le casier s’ouvre à la même hauteur pendant un achat ou un réassort. Chaque case représente une unité. Survoler ou sélectionner la base du rayon permet aussi de l’ouvrir.
+- L’employé rejoint les rayons sous la moitié de leur capacité, puis retourne à la réserve attenante. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.
-- **Commandes** donne accès à la pause, aux vitesses 1×, 2× et 4× et à l’aide. Sur PC, Espace met le jeu en pause hors boutons. Échap ferme le panneau ouvert ou quitte le placement.
-- Survoler un rayon hors construction pour consulter son stock.
+- La pause et les vitesses ×1, ×2 et ×3 sont en haut à droite. **Commandes** ouvre l’aide. Sur PC, la molette zoome vers le curseur et un glissement avec le bouton gauche déplace la caméra. Espace met le jeu en pause hors boutons et Échap ferme le panneau ouvert ou quitte le placement.
 
-**Pas de sauvegarde pour cette étape : actualiser la page recommence la partie.**
+La partie est sauvegardée automatiquement dans le navigateur. Rouvrir le jeu à la même adresse, sur le même appareil et dans le même navigateur, reprend la simulation, la vitesse et la pause. **Commandes → Nouvelle partie** permet de recommencer après confirmation.
 
 ## Vérifier
 

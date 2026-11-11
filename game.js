@@ -4,6 +4,10 @@
         canvas = document.getElementById('gameCanvas'),
         renderer = new StoreRenderer(canvas);
     let selected = null,
+        rotated = false,
+        targetTile = null,
+        editing = null,
+        confirmRemoval = false,
         hover = null,
         speed = 1,
         paused = false,
@@ -64,6 +68,12 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => ($('toast').className = 'toast'), 4000);
     }
+    function clearError() {
+        if (!$('toast').classList.contains('error')) return;
+        clearTimeout(toastTimer);
+        $('toast').className = 'toast';
+        $('toast').textContent = '';
+    }
     for (const [type, d] of Object.entries(Store.CATALOG)) {
         const button = document.createElement('button');
         button.className = 'catalog-card';
@@ -78,6 +88,10 @@
                 return;
             }
             selected = type;
+            rotated = false;
+            targetTile = null;
+            editing = null;
+            confirmRemoval = false;
             StoreRenderer.thumbnail($('placementArt'), type);
             panel.close();
             canvas.focus({ preventScroll: true });
@@ -122,7 +136,7 @@
         if (recommendation !== hintedProduct && recommendation)
             StoreRenderer.thumbnail($('demandArt'), recommendation);
         hintedProduct = recommendation;
-        demandHint.hidden = !hintedProduct || !!selected;
+        demandHint.hidden = !hintedProduct || !!selected || !!editing;
         if (hintedProduct) {
             setText($('demandProduct'), Store.CATALOG[hintedProduct].detail);
             setText($('demandCount'), missedLabel(state.demand[hintedProduct].missed));
@@ -141,24 +155,64 @@
             return `<div class="goal"><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track" aria-hidden="true"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? '✓ Prime reçue' : `+${g.reward} €`}</b></div></div>`;
         }).join('');
         updateCatalog();
-        $('placement').hidden = !selected;
+        $('placement').hidden = !selected && !editing;
+        $('placeButton').hidden = !selected;
+        $('removeButton').hidden = !editing;
+        $('removeButton').textContent = confirmRemoval ? 'Confirmer' : 'Retirer';
+        $('rotateButton').setAttribute('aria-pressed', String(selected ? rotated : !!editing?.rotated));
         if (selected) {
             const item = Store.CATALOG[selected];
+            const valid = targetTile && Store.placement(state, selected, targetTile.x, targetTile.y, rotated).ok;
             $('placementName').textContent = item.name;
-            $('placementPrice').textContent = `${item.cost} € · Case libre`;
+            $('placementPrice').textContent = `${item.cost} € · ${targetTile ? valid ? 'Prêt à poser' : 'Pose impossible' : 'Choisis une case'}`;
+            $('placeButton').disabled = !valid;
+        } else if (editing) {
+            $('placementName').textContent = Store.CATALOG[editing.type].name;
+            $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} en stock`;
         }
         canvas.style.cursor = selected ? 'crosshair' : 'default';
         $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';
-        $('pauseButton').textContent = paused ? '▶ Reprendre' : 'Ⅱ Pause';
-        $('pauseButton').setAttribute('aria-pressed', String(paused));
+        const pauseButton = $('pauseButton');
+        pauseButton.textContent = paused ? '▶' : 'Ⅱ';
+        pauseButton.title = paused ? 'Reprendre' : 'Pause';
+        pauseButton.setAttribute('aria-label', pauseButton.title);
+        pauseButton.setAttribute('aria-pressed', String(paused));
     }
     function cancel() {
-        if (!selected) return;
+        if (!selected && !editing) return;
         selected = null;
+        targetTile = null;
+        editing = null;
+        confirmRemoval = false;
         updateUI();
         canvas.focus({ preventScroll: true });
     }
     $('cancelButton').addEventListener('click', cancel);
+    $('placeButton').addEventListener('click', () => {
+        if (selected && targetTile) placeSelected();
+    });
+    $('rotateButton').addEventListener('click', () => {
+        if (selected) {
+            rotated = !rotated;
+            clearError();
+        } else if (editing) {
+            const result = Store.rotate(state, editing.id);
+            if (!result.ok) toast(result.reason, true);
+            else clearError();
+            confirmRemoval = false;
+        }
+        updateUI();
+    });
+    $('removeButton').addEventListener('click', () => {
+        if (!editing) return;
+        if (confirmRemoval && Store.remove(state, editing.id)) {
+            toast(`${Store.CATALOG[editing.type].name} a été retiré.`);
+            cancel();
+            return;
+        }
+        confirmRemoval = true;
+        updateUI();
+    });
     $('pauseButton').addEventListener('click', () => {
         paused = !paused;
         updateUI();
@@ -172,15 +226,35 @@
             });
         }),
     );
-    function activateTile(x, y) {
-        hover = renderer.pick(x, y);
-        if (!selected) return;
-        const result = Store.place(state, selected, hover.x, hover.y);
+    function placeSelected() {
+        const result = Store.place(state, selected, targetTile.x, targetTile.y, rotated);
         if (!result.ok) toast(result.reason, true);
         else {
-            selected = null;
+            cancel();
             drainEvents();
         }
+        updateUI();
+    }
+    function activateTile(x, y, touch = false) {
+        const tile = renderer.pick(x, y);
+        if (selected) {
+            targetTile = tile;
+            if (touch) {
+                const result = Store.placement(state, selected, tile.x, tile.y, rotated);
+                if (!result.ok) toast(result.reason, true);
+                else clearError();
+                updateUI();
+            } else placeSelected();
+            return;
+        }
+        const shelf = Store.shelfAt(state.buildings, tile.x, tile.y);
+        if (!shelf) {
+            cancel();
+            return;
+        }
+        editing = shelf;
+        confirmRemoval = false;
+        StoreRenderer.thumbnail($('placementArt'), shelf.type);
         updateUI();
     }
     const point = (e) => ({ x: e.clientX, y: e.clientY });
@@ -229,7 +303,7 @@
         const tap = e.type === 'pointerup' && !touchGesture && distance(previous, point(e)) < tapSlop;
         touches.delete(e.pointerId);
         if (!touches.size) touchGesture = false;
-        if (tap) activateTile(e.clientX, e.clientY);
+        if (tap) activateTile(e.clientX, e.clientY, true);
     }
     canvas.addEventListener('pointerup', endTouch);
     canvas.addEventListener('pointercancel', endTouch);
@@ -237,6 +311,15 @@
     canvas.addEventListener('pointerleave', () => {
         if (!touches.size) hover = null;
     });
+    canvas.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.deltaY === 0) return;
+        e.preventDefault();
+        const anchor = point(e);
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? renderer.height : 1;
+        const delta = Math.max(-180, Math.min(180, e.deltaY * unit));
+        renderer.moveCamera(anchor, anchor, Math.exp(-delta * 0.002));
+        hover = renderer.pick(anchor.x, anchor.y);
+    }, { passive: false });
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (e.pointerType !== 'touch' && !touches.size) cancel();
@@ -271,7 +354,7 @@
                 uiClock = 0;
             }
         }
-        renderer.render(state, hover, selected);
+        renderer.render(state, hover || targetTile, selected && { type: selected, rotated }, editing);
         requestAnimationFrame(frame);
     }
     updateUI();

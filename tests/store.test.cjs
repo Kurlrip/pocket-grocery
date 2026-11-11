@@ -139,6 +139,57 @@ test('building during active routes re-plans without stranding customers', () =>
     assert.ok(s.served > 10);
 });
 
+test('rotated shelves swap their footprint without losing stock or charging again', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 7, true).ok, true);
+    const shelf = s.buildings.at(-1);
+    assert.equal(S.shelfAt(s.buildings, 5, 8), shelf);
+    assert.notEqual(S.shelfAt(s.buildings, 6, 7), shelf);
+    const before = JSON.stringify(s);
+    assert.equal(S.rotate(s, shelf.id).ok, false);
+    assert.equal(JSON.stringify(s), before);
+    const existing = s.buildings[0];
+    const money = s.money, stock = existing.stock;
+    assert.equal(S.rotate(s, existing.id).ok, true);
+    assert.equal(S.gridFor(s.buildings)[4][3], existing.id);
+    assert.equal(S.gridFor(s.buildings)[3][4], 0);
+    assert.equal(existing.stock, stock);
+    assert.equal(s.money, money);
+});
+
+test('removing a shelf redirects a shopper and an employee without refunding the shelf', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 6).ok, true);
+    const shelf = s.buildings.at(-1);
+    shelf.stock = 1;
+    run(s, 2);
+    const shopper = s.customers.find((a) => a.target === shelf.id);
+    assert.ok(shopper);
+    assert.equal(s.staff.target, shelf.id);
+    const money = s.money;
+    assert.equal(S.remove(s, shelf.id), true);
+    assert.equal(s.money, money);
+    assert.equal(s.staff.state, 'return');
+    assert.equal(shopper.target, 1);
+    assert.equal(S.remove(s, shelf.id), false);
+    run(s, 20);
+    assert.ok(s.demand.produce.sold > 0);
+});
+
+test('rotation preserves the current movement segment and leads to a valid shelf access', () => {
+    const s = S.create();
+    run(s, 2);
+    const shopper = s.customers.find((a) => a.request === 'produce');
+    const shelf = s.buildings.find((b) => b.id === shopper.target);
+    const next = shopper.route[0];
+    assert.equal(S.rotate(s, shelf.id).ok, true);
+    assert.deepEqual(shopper.route[0], next);
+    assert.ok(S.serviceCells(shelf, S.gridFor(s.buildings)).some((cell) =>
+        cell.x === shopper.route.at(-1).x && cell.y === shopper.route.at(-1).y));
+    run(s, 15);
+    assert.ok(s.demand.produce.sold > 0);
+});
+
 test('the same fixed steps reproduce the same economy and agents', () => {
     const a = S.create(),
         b = S.create();

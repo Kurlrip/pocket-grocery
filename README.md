@@ -22,7 +22,7 @@ python -m http.server 8080
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.
 - La pause et les vitesses ×1, ×2 et ×3 sont en haut à droite. **Commandes** ouvre l’aide. Sur PC, la molette zoome vers le curseur et un glissement avec le bouton gauche déplace la caméra. Espace met le jeu en pause hors boutons et Échap ferme le panneau ouvert ou quitte le placement.
 
-**Pas de sauvegarde pour cette étape : actualiser la page recommence la partie.**
+La partie est sauvegardée automatiquement dans le navigateur. Rouvrir le jeu à la même adresse, sur le même appareil et dans le même navigateur, reprend la simulation, la vitesse et la pause. **Commandes → Nouvelle partie** permet de recommencer après confirmation.
 
 ## Vérifier
 

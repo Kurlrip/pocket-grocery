@@ -1,6 +1,14 @@
 (() => {
     'use strict';
-    const state = Store.create(),
+    function openSave() {
+        try {
+            return StoreSave.open(window.localStorage);
+        } catch {
+            return StoreSave.open(null);
+        }
+    }
+    const save = openSave(),
+        state = save.loaded?.state ?? Store.create(),
         canvas = document.getElementById('gameCanvas'),
         renderer = new StoreRenderer(canvas);
     let selected = null,
@@ -9,12 +17,15 @@
         editing = null,
         confirmRemoval = false,
         hover = null,
-        speed = 1,
-        paused = false,
+        speed = save.loaded?.speed ?? 1,
+        paused = save.loaded?.paused ?? false,
         last = 0,
         accumulator = 0,
         uiClock = 0,
         toastTimer = 0;
+    let saveDirty = save.status === 'empty',
+        lastSave = 0,
+        restarting = false;
     const moneyFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
     const touches = new Map();
     let touchGesture = false;
@@ -31,6 +42,32 @@
     function setText(element, text) {
         if (element.textContent !== text) element.textContent = text;
     }
+    const saveMessages = {
+        empty: 'Sauvegarde automatique sur cet appareil.',
+        ready: 'Partie sauvegardée sur cet appareil.',
+        unavailable: 'Sauvegarde indisponible dans ce navigateur.',
+        invalid: 'Sauvegarde illisible ou incompatible. Nouvelle partie pour la remplacer.',
+        conflict: 'Partie modifiée dans un autre onglet. Rechargez le jeu pour la reprendre.',
+    };
+    function saveNow() {
+        if (!saveDirty || restarting || !['empty', 'ready'].includes(save.status)) return;
+        lastSave = performance.now();
+        if (save.write(state, speed, paused)) saveDirty = false;
+        else {
+            if (save.status === 'conflict') paused = true;
+            toast(saveMessages[save.status], true);
+            updateUI();
+        }
+        setText($('saveStatus'), saveMessages[save.status]);
+    }
+    function checkpoint() {
+        saveDirty = true;
+        saveNow();
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) saveNow();
+    });
+    window.addEventListener('pagehide', saveNow);
     function missedLabel(count) {
         return count === 1 ? '1 demande manquée' : `${count} demandes manquées`;
     }
@@ -62,6 +99,26 @@
     $('closePanel').addEventListener('click', () => panel.close());
     panel.addEventListener('close', () => {
         for (const button of panelButtons) button.setAttribute('aria-expanded', 'false');
+        $('restartConfirm').hidden = true;
+        $('restartButton').hidden = false;
+    });
+    $('restartButton').addEventListener('click', () => {
+        $('restartButton').hidden = true;
+        $('restartConfirm').hidden = false;
+        $('restartNo').focus();
+    });
+    $('restartNo').addEventListener('click', () => {
+        $('restartConfirm').hidden = true;
+        $('restartButton').hidden = false;
+        $('restartButton').focus();
+    });
+    $('restartYes').addEventListener('click', () => {
+        if (!save.write(Store.create(), 1, false, true)) {
+            setText($('saveStatus'), saveMessages[save.status]);
+            return;
+        }
+        restarting = true;
+        window.location.reload();
     });
     function toast(text, error = false) {
         $('toast').textContent = text;
@@ -200,7 +257,10 @@
         } else if (editing) {
             const result = Store.rotate(state, editing.id);
             if (!result.ok) toast(result.reason, true);
-            else clearError();
+            else {
+                clearError();
+                checkpoint();
+            }
             confirmRemoval = false;
         }
         updateUI();
@@ -210,30 +270,40 @@
         if (confirmRemoval && Store.remove(state, editing.id)) {
             toast(`${Store.CATALOG[editing.type].name} a été retiré.`);
             cancel();
+            checkpoint();
             return;
         }
         confirmRemoval = true;
         updateUI();
     });
-    $('pauseButton').addEventListener('click', () => {
+    function togglePause() {
         paused = !paused;
+        checkpoint();
         updateUI();
-    });
-    document.querySelectorAll('[data-speed]').forEach((b) =>
-        b.addEventListener('click', () => {
-            speed = Number(b.dataset.speed);
-            document.querySelectorAll('[data-speed]').forEach((b) => {
-                b.classList.toggle('active', Number(b.dataset.speed) === speed);
-                b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === speed));
-            });
-        }),
-    );
+    }
+    $('pauseButton').addEventListener('click', togglePause);
+    const speedButtons = [...document.querySelectorAll('[data-speed]')];
+    function updateSpeedButtons() {
+        for (const button of speedButtons) {
+            const active = Number(button.dataset.speed) === speed;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        }
+    }
+    for (const button of speedButtons) {
+        button.addEventListener('click', () => {
+            speed = Number(button.dataset.speed);
+            updateSpeedButtons();
+            checkpoint();
+        });
+    }
     function placeSelected() {
         const result = Store.place(state, selected, targetTile.x, targetTile.y, rotated);
         if (!result.ok) toast(result.reason, true);
         else {
             cancel();
             drainEvents();
+            checkpoint();
         }
         updateUI();
     }
@@ -358,8 +428,7 @@
         if (e.key === 'Escape') cancel();
         if (e.code === 'Space' && !['BUTTON', 'INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
             e.preventDefault();
-            paused = !paused;
-            updateUI();
+            togglePause();
         }
     });
     function drainEvents() {
@@ -376,6 +445,7 @@
             while (accumulator >= 1 / 30) {
                 Store.step(state, 1 / 30, animateStock);
                 accumulator -= 1 / 30;
+                saveDirty = true;
             }
             uiClock += elapsed;
             if (uiClock > 0.25) {
@@ -384,9 +454,13 @@
                 uiClock = 0;
             }
         }
+        if (now - lastSave >= 3000) saveNow();
         renderer.render(state, hover || targetTile, selected && { type: selected, rotated }, editing, now);
         requestAnimationFrame(frame);
     }
+    setText($('saveStatus'), saveMessages[save.status]);
+    updateSpeedButtons();
     updateUI();
+    if (save.status === 'invalid' || save.status === 'unavailable') toast(saveMessages[save.status], true);
     requestAnimationFrame(frame);
 })();

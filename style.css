@@ -337,6 +337,15 @@ h1, h2, h3, p { margin: 0; }
     pointer-events: auto;
 }
 .time-controls button { padding-inline: 4px; }
+.save-options {
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid #dfb77e;
+    border-radius: 11px;
+    background: #fff8e8;
+}
+.save-options p { margin-bottom: 8px; }
+#restartConfirm p { margin-top: 4px; }
 details { background: #fff8e8; border-radius: 11px; padding: 0 10px 4px; }
 summary { min-height: 44px; padding: 12px 0; font-weight: 800; cursor: pointer; }
 details ol { padding-inline-start: 20px; }

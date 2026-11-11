@@ -15,9 +15,12 @@ python -m http.server 8080
 - Ouvrir **Construire** et choisir un rayon. Sur téléphone, toucher une case pour afficher l’aperçu, puis appuyer sur **Poser**. Sur PC, survoler une case pour prévisualiser et cliquer pour construire. **Tourner** change l’orientation du rayon avant la pose.
 - Hors construction, sélectionner un rayon par sa base pour le déplacer gratuitement en conservant son stock, le tourner sur place ou le retirer. Le retrait est confirmé et ne rembourse pas l’achat.
 - **Construire → Voir l’extension** montre l’aile latérale. Son achat coûte 650 € et ouvre 15 cases supplémentaires.
+- **Construire → Acheter une caisse** ajoute un comptoir pour 190 €. Sélectionner sa base permet de le déplacer gratuitement ou d’embaucher une caissière pour 95 €. Une caisse libre reste fermée.
+- **Construire → Équipe** permet d’embaucher un renfort de réserve pour 140 €. En fin de journée, chaque caissière recrutée coûte 24 € et chaque renfort 32 €. La caisse règle ce qu’elle peut, le reste est reporté au jour suivant. L’équipe de départ est incluse.
 - Sur téléphone, glisser avec un doigt déplace la vue et pincer avec deux doigts zoome. Le catalogue et les objectifs s’ouvrent depuis le dock.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
 - Chaque client cherche un type de produit. Le catalogue indique le stock, les ventes et les demandes manquées par rayon depuis le début de la partie. Une suggestion apparaît quand un produit demandé reste indisponible.
+- Une bulle brève montre le produit recherché, la satisfaction après paiement ou la déception si le produit manque.
 - Chaque rayon a une jauge au-dessus du meuble. Le casier s’ouvre à la même hauteur pendant un achat ou un réassort. Chaque case représente une unité. Survoler ou sélectionner la base du rayon permet aussi de l’ouvrir.
 - L’employé rejoint les rayons sous la moitié de leur capacité, puis retourne à la réserve attenante. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.

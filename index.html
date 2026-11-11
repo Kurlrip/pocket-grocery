@@ -54,6 +54,7 @@
                         <button id="placeButton" class="small-button active">Poser</button>
                         <button id="removeButton" class="small-button" hidden>Retirer</button>
                         <button id="moveButton" class="small-button" hidden>Déplacer</button>
+                        <button id="hireCashierButton" class="small-button active" hidden></button>
                         <button id="cancelButton" class="small-button">Annuler</button>
                     </div>
                 </div>
@@ -88,12 +89,29 @@
             <div class="panel-body">
                 <section id="construction" hidden>
                     <button id="expansionButton" class="small-button expansion-button"></button>
+                    <div class="construction-tools">
+                        <button id="counterButton" class="small-button"></button>
+                        <button class="small-button" data-panel="team" aria-haspopup="dialog">Équipe</button>
+                    </div>
                     <p class="panel-note">Les ventes et les demandes manquées sont comptées depuis l’ouverture. Premier stock inclus.</p>
                     <p id="catalogFeedback" role="status" class="catalog-feedback" hidden></p>
                     <div id="catalog" class="catalog"></div>
                 </section>
                 <section id="objectives" hidden><div id="goals"></div></section>
                 <section id="report" hidden></section>
+                <section id="team" hidden>
+                    <section class="goal">
+                        <h3>Équipe du magasin</h3>
+                        <p id="teamSummary"></p>
+                        <p id="teamWages"></p>
+                        <p>Pour embaucher une caissière, sélectionnez une caisse libre dans le magasin.</p>
+                    </section>
+                    <section class="goal">
+                        <h3>Réserve</h3>
+                        <p id="helperDetails"></p>
+                        <button id="hireHelperButton" class="small-button"></button>
+                    </section>
+                </section>
                 <section id="controls" hidden>
                     <section class="save-options" aria-label="Sauvegarde">
                         <p id="saveStatus" role="status"></p>

@@ -199,7 +199,7 @@ h1, h2, h3, p { margin: 0; }
 .placement small { display: block; color: #6f4828; font-weight: 700; }
 .placement-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
 .placement-actions button { flex: 1 1 auto; }
-.placement-actions button:disabled { opacity: .55; cursor: default; }
+.small-button:disabled { opacity: .55; cursor: default; }
 .scene:has(.placement:not([hidden])) .toast { bottom: 118px; }
 .demand-hint {
     bottom: 10px;
@@ -349,6 +349,9 @@ h1, h2, h3, p { margin: 0; }
 }
 .time-controls button { padding-inline: 4px; }
 .expansion-button { width: 100%; margin-bottom: 10px; text-align: left; }
+.construction-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.construction-tools button { flex: 1 1 auto; }
+#team p { margin-block: 7px; }
 .day-report + .day-report { margin-top: 12px; }
 .day-report h3 { margin-bottom: 6px; }
 .day-report p { font-size: 13px; margin-bottom: 7px; }

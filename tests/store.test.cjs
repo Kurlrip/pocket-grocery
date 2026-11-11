@@ -265,6 +265,72 @@ test('the previous day is frozen and the new day reports only its own activity',
     }
 });
 
+test('a new checkout needs a cashier and can move without charging or stranding a customer', () => {
+    const s = S.create();
+    s.money = 1500;
+    assert.equal(S.placeCounter(s, 3, 3).ok, false);
+    assert.ok(S.placeCounter(s, 5, 3).ok);
+    const counter = s.counters.at(-1);
+    assert.equal(counter.staffed, false);
+    assert.equal(s.money, 1500 - S.TEAM.counter);
+    run(s, 20);
+    assert.ok(s.customers.every((a) => a.checkoutId !== counter.id));
+    assert.ok(S.hireCashier(s, counter.id));
+    assert.equal(S.hireCashier(s, counter.id), false);
+    const target = S.checkoutCell(counter);
+    const grid = S.gridFor(s.buildings, s.expanded, s.counters);
+    const route = S.path(grid, S.ENTRANCE, target);
+    const customer = { ...S.ENTRANCE, route, request: 'produce', state: 'checkout',
+        checkoutId: counter.id, timer: 1.1, value: S.CATALOG.produce.price, color: 0 };
+    s.customers.push(customer);
+    const money = s.money, next = route[0];
+    assert.ok(S.placeCounter(s, 6, 4, counter.id).ok);
+    assert.equal(s.money, money);
+    assert.ok(counter.staffed);
+    assert.deepEqual(customer.route[0], next);
+    assert.deepEqual(customer.route.at(-1), S.checkoutCell(counter));
+});
+
+test('reserve hires split restocks and unpaid wages carry forward at day end', () => {
+    const s = S.create();
+    s.money = 1800;
+    assert.ok(S.placeCounter(s, 5, 3).ok);
+    assert.ok(S.hireCashier(s, 3));
+    assert.ok(S.hireHelper(s));
+    s.buildings[0].stock = s.buildings[1].stock = 1;
+    S.step(s, 1 / 30);
+    assert.deepEqual(S.workers(s).map((worker) => worker.target), [1, 2]);
+    const fees = s.payrollSpent;
+    s.money = 20;
+    s.time = S.DAY_LENGTH - 0.01;
+    S.step(s, 1 / 30);
+    assert.equal(s.money, 0);
+    assert.equal(s.payrollDue, S.TEAM.cashierWage + S.TEAM.helperWage - 20);
+    assert.equal(s.lastDay.payrollSpent, fees + 20);
+});
+
+test('each staffed checkout processes one waiting customer at a time', () => {
+    const s = S.create();
+    s.spawnTimer = Infinity;
+    const shopper = (counter) => ({ ...S.checkoutCell(counter), route: [], request: 'produce',
+        state: 'checkout', checkoutId: counter.id, timer: 1, value: S.CATALOG.produce.price, color: 0 });
+    const [first, second] = s.counters;
+    s.customers = [shopper(first), shopper(first), shopper(second)];
+    S.step(s, 0.25);
+    assert.deepEqual(s.customers.map((a) => a.timer), [0.75, 1, 0.75]);
+});
+
+test('customers show their request, a successful checkout or a missed purchase briefly', () => {
+    const s = S.create();
+    const moods = new Set();
+    for (let tick = 0; tick < 1200; tick++) {
+        S.step(s, 1 / 30);
+        for (const a of s.customers)
+            if (a.moodUntil > s.time) moods.add(a.mood);
+    }
+    assert.deepEqual(moods, new Set(['request', 'happy', 'missed']));
+});
+
 test('the same fixed steps reproduce the same economy and agents', () => {
     const a = S.create(),
         b = S.create();

@@ -36,7 +36,7 @@
     const panel = $('gamePanel');
     const panelBody = panel.querySelector('.panel-body');
     const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier',
-        controls: 'Commandes', report: 'Bilan du magasin' };
+        controls: 'Commandes', report: 'Bilan du magasin', team: 'Équipe' };
     const panelButtons = [...document.querySelectorAll('[data-panel]')];
     const catalogFeedback = $('catalogFeedback');
     const demandHint = $('demandHint');
@@ -91,7 +91,8 @@
             catalogFeedback.hidden = true;
             hover = null;
             button.setAttribute('aria-expanded', 'true');
-            panel.showModal();
+            if (!panel.open) panel.showModal();
+            else $('closePanel').focus();
             panelBody.scrollTop = 0;
             if (button === demandHint && hintedProduct) {
                 const card = catalogCards.get(hintedProduct).button;
@@ -214,14 +215,27 @@
                 `<tr><th scope="row">${Store.CATALOG[type].detail}</th><td>${sold}</td><td>${format(sold * Store.CATALOG[type].price)}</td><td>${missed}</td></tr>`).join('');
             return `<section class="goal day-report"><h3>Jour ${report.day} · ${i ? 'Terminé' : 'En cours'}</h3>
                 ${report.partial ? '<p>Ce bilan commence à la reprise de la sauvegarde.</p>' : ''}
-                <p>Ventes <b>${format(report.revenue)}</b> · Réassort <b>${format(report.supplySpent)}</b></p>
-                <p>Ventes après réassort <b>${format(report.revenue - report.supplySpent)}</b></p>
+                <p>Ventes <b>${format(report.revenue)}</b> · Réassort <b>${format(report.supplySpent)}</b> · Équipe <b>${format(report.payrollSpent)}</b></p>
+                <p>Solde d’exploitation <b>${format(report.revenue - report.supplySpent - report.payrollSpent)}</b></p>
                 <table><thead><tr><th scope="col">Produit</th><th scope="col">Vendus</th><th scope="col">Recettes</th><th scope="col">Manqués</th></tr></thead><tbody>${rows}</tbody></table></section>`;
         }).join('');
     }
     function validateDraft({ x, y }) {
+        if (selected === 'counter') return Store.counterPlacement(state, x, y, moving?.id);
         return moving ? Store.movePlacement(state, moving.id, x, y, rotated) :
             Store.placement(state, selected, x, y, rotated);
+    }
+    const counterSelected = (item) => item && !item.type;
+    function updateTeam() {
+        const team = Store.TEAM;
+        const active = state.counters.filter((b) => b.staffed).length;
+        $('teamSummary').textContent = `${active} / ${state.counters.length} caisses ouvertes · ${1 + state.helpers.length} en réserve`;
+        $('teamWages').textContent = `Salaires supplémentaires ${Store.dailyWages(state)} € / jour` +
+            (state.payrollDue ? ` · ${state.payrollDue} € à régler` : '');
+        $('helperDetails').textContent = `Un renfort aide au réassort pour ${team.helperWage} € / jour.`;
+        $('hireHelperButton').textContent = state.helpers.length >= team.maxHelpers ?
+            'Équipe complète' : `Embaucher un renfort · ${team.helper} €`;
+        $('hireHelperButton').disabled = state.money < team.helper || state.helpers.length >= team.maxHelpers;
     }
     function updateUI() {
         $('money').textContent = `${moneyFormat.format(state.money)} €`;
@@ -237,11 +251,20 @@
             return `<div class="goal"><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track" aria-hidden="true"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? '✓ Prime reçue' : `+${g.reward} €`}</b></div></div>`;
         }).join('');
         updateCatalog();
+        updateTeam();
+        const cashier = counterSelected(editing);
+        $('counterButton').textContent = state.counters.length >= Store.TEAM.maxCounters ?
+            'Nombre maximal de caisses atteint' : `Acheter une caisse · ${Store.TEAM.counter} €`;
+        $('counterButton').disabled = state.money < Store.TEAM.counter || state.counters.length >= Store.TEAM.maxCounters;
         $('placement').hidden = !selected && !editing;
         $('placeButton').hidden = !selected;
         $('placeButton').textContent = moving ? 'Déplacer ici' : 'Poser';
-        $('removeButton').hidden = !editing;
+        $('removeButton').hidden = !editing || cashier;
         $('moveButton').hidden = !editing;
+        $('rotateButton').hidden = selected === 'counter' || cashier;
+        $('hireCashierButton').hidden = !cashier || editing.staffed;
+        $('hireCashierButton').textContent = `Embaucher · ${Store.TEAM.cashier} €`;
+        $('hireCashierButton').disabled = state.money < Store.TEAM.cashier;
         $('removeButton').textContent = confirmRemoval ? 'Confirmer' : 'Retirer';
         $('expansionButton').hidden = state.expanded;
         $('expansionPreview').hidden = !expanding;
@@ -253,12 +276,15 @@
         $('buyExpansionButton').disabled = !!missing;
         $('rotateButton').setAttribute('aria-pressed', String(selected ? rotated : !!editing?.rotated));
         if (selected) {
-            const item = Store.CATALOG[selected];
+            const item = selected === 'counter' ? { name: 'Caisse', cost: Store.TEAM.counter } : Store.CATALOG[selected];
             const valid = targetTile && validateDraft(targetTile).ok;
             $('placementName').textContent = item.name;
             const instruction = targetTile ? valid ? 'Emplacement libre' : 'Emplacement impossible' : 'Choisis une case';
             $('placementPrice').textContent = `${moving ? 'Déplacement gratuit' : item.cost + ' €'} · ${instruction}`;
             $('placeButton').disabled = !valid;
+        } else if (cashier) {
+            $('placementName').textContent = `Caisse ${editing.id}`;
+            $('placementPrice').textContent = editing.staffed ? 'Ouverte' : `Libre · Salaire ${Store.TEAM.cashierWage} € / jour`;
         } else if (editing) {
             $('placementName').textContent = Store.CATALOG[editing.type].name;
             const capacity = Store.CATALOG[editing.type].capacity;
@@ -285,10 +311,32 @@
     }
     $('cancelButton').addEventListener('click', cancel);
     $('cancelExpansionButton').addEventListener('click', cancel);
+    $('counterButton').addEventListener('click', () => {
+        cancel();
+        selected = 'counter';
+        rotated = false;
+        hover = null;
+        StoreRenderer.thumbnail($('placementArt'), selected);
+        panel.close();
+        updateUI();
+        canvas.focus({ preventScroll: true });
+    });
+    $('hireCashierButton').addEventListener('click', () => {
+        if (counterSelected(editing) && Store.hireCashier(state, editing.id)) {
+            toast('La caisse est ouverte !');
+            checkpoint();
+            updateUI();
+        }
+    });
+    $('hireHelperButton').addEventListener('click', () => {
+        if (!Store.hireHelper(state)) return;
+        checkpoint();
+        updateUI();
+    });
     $('moveButton').addEventListener('click', () => {
         if (!editing) return;
         moving = editing;
-        selected = editing.type;
+        selected = editing.type || 'counter';
         rotated = !!editing.rotated;
         targetTile = null;
         editing = null;
@@ -367,10 +415,12 @@
     }
     function placeSelected() {
         const { x, y } = targetTile;
-        const result = moving ? Store.moveShelf(state, moving.id, x, y, rotated) : Store.place(state, selected, x, y, rotated);
+        const result = selected === 'counter' ? Store.placeCounter(state, x, y, moving?.id) :
+            moving ? Store.moveShelf(state, moving.id, x, y, rotated) : Store.place(state, selected, x, y, rotated);
         if (!result.ok) toast(result.reason, true);
         else {
-            if (moving) toast('Rayon déplacé.');
+            if (moving) toast(selected === 'counter' ? 'Caisse déplacée.' : 'Rayon déplacé.');
+            else if (selected === 'counter') toast('Caisse installée. Sélectionnez-la pour embaucher une caissière.');
             cancel();
             drainEvents();
             checkpoint();
@@ -390,14 +440,15 @@
             } else placeSelected();
             return;
         }
-        const shelf = Store.shelfAt(state.buildings, tile.x, tile.y);
+        const shelf = Store.shelfAt(state.buildings, tile.x, tile.y) ||
+            state.counters.find((b) => tile.y === b.y && (tile.x === b.x || tile.x === b.x + 1));
         if (!shelf) {
             cancel();
             return;
         }
         editing = shelf;
         confirmRemoval = false;
-        StoreRenderer.thumbnail($('placementArt'), shelf.type);
+        StoreRenderer.thumbnail($('placementArt'), shelf.type || 'counter');
         updateUI();
     }
     const point = (e) => ({ x: e.clientX, y: e.clientY });

@@ -486,6 +486,50 @@
             this.box(x + 0.05, y + 0.05, 1.9, 0.85, 0, 29, '#f4dcc0', '#d3473e', '#9e292c');
             this.box(x + 1.1, y + 0.3, 0.35, 0.35, 29, 14, '#7795a2', '#38424d', '#232b34');
         }
+        customerBubble(a, time, occupied) {
+            const p = this.p(a.x + 0.5, a.y + 0.5, 49);
+            const x = this.origin.x + p.x * this.scale, y = this.origin.y + p.y * this.scale;
+            if (x < 15 || x > this.width - 15 || y < 24 || y > this.height - 15) return;
+            const happy = a.mood === 'happy', missed = a.mood === 'missed';
+            const line = happy ? 'Super !' : missed ? 'Dommage…' : 'Je cherche…';
+            const product = !happy && Store.CATALOG[a.request].detail;
+            const c = this.ctx;
+            c.save();
+            c.font = 'bold 11px sans-serif';
+            const width = Math.max(53, c.measureText(product || line).width + 16);
+            const height = product ? 36 : 23;
+            const left = clamp(x - width / 2, 4, this.width - width - 4);
+            const top = Math.max(3, y - height - 6);
+            if (occupied.some((b) => left < b.x + b.w + 4 && left + width + 4 > b.x &&
+                top < b.y + b.h + 4 && top + height + 4 > b.y)) {
+                c.restore();
+                return;
+            }
+            occupied.push({ x: left, y: top, w: width, h: height });
+            c.translate((left - this.origin.x) / this.scale, (top - this.origin.y) / this.scale);
+            c.scale(1 / this.scale, 1 / this.scale);
+            if (!reducedMotion.matches) c.globalAlpha *= clamp((a.moodUntil - time) / 0.45, 0, 1);
+            const fill = happy ? '#eff7d7' : missed ? '#fff0db' : '#fff9e9';
+            const edge = happy ? '#639151' : missed ? '#b67953' : '#597c89';
+            const tail = clamp(x - left, 9, width - 9);
+            this.polygon([{ x: tail - 4, y: height - 1 }, { x: tail, y: height + 5 },
+                { x: tail + 4, y: height - 1 }], fill, edge, 1);
+            c.beginPath();
+            c.roundRect(0, 0, width, height, 9);
+            c.fillStyle = fill;
+            c.fill();
+            c.strokeStyle = edge;
+            c.lineWidth = 1;
+            c.stroke();
+            c.fillStyle = happy ? '#3b6a3e' : missed ? '#925638' : '#325363';
+            c.textAlign = 'center';
+            c.fillText(line, width / 2, 15);
+            if (product) {
+                c.font = '10px sans-serif';
+                c.fillText(product, width / 2, 28);
+            }
+            c.restore();
+        }
         wallFace(alongX, start = 0, end = 10, offset = 0, height = 68) {
             const point = (u, z) => (alongX ? this.p(u, offset, z) : this.p(offset, u, z));
             const c = this.ctx;
@@ -708,7 +752,7 @@
                     this.surface(x, y, 1, 1, 0.1, (x + y) % 2 ? '#f1d1ad' : '#f8dfc3', '#bc91695e');
                 }
             if (editing) {
-                const { w, h } = Store.sizeOf(editing);
+                const { w, h } = Store.sizeOf({ type: editing.type || 'counter', rotated: editing.rotated });
                 this.surface(editing.x, editing.y, w, h, 1, '#62a6d878', '#2674a7');
             }
             this.walls();
@@ -716,7 +760,7 @@
             const renderables = state.buildings.map((b) => ({
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
                 draw: () => {
-                    if (draft?.id !== b.id) {
+                    if (draft?.type === 'counter' || draft?.id !== b.id) {
                         this.building(b);
                         return;
                     }
@@ -727,9 +771,18 @@
                 },
             }));
             const cashierOffset = StoreSprites.hasHDFurniture('counter') ? 0.35 : 0;
-            for (const { x, y } of Store.COUNTERS) {
-                renderables.push({ depth: x + y + 1.5, draw: () => this.counter(x, y) });
+            for (const { x, y, id, staffed } of state.counters) {
+                const movingCounter = draft?.type === 'counter' && draft.id === id;
                 renderables.push({
+                    depth: x + y + 1.5,
+                    draw: () => {
+                        c.save();
+                        if (movingCounter) c.globalAlpha = 0.45;
+                        this.counter(x, y);
+                        c.restore();
+                    },
+                });
+                if (staffed && !movingCounter) renderables.push({
                     depth: x + y + 0.25,
                     draw: () => this.person(
                         { x: x + 0.25 + cashierOffset, y: y - 1 + cashierOffset, color: 0 },
@@ -751,25 +804,20 @@
             for (const a of state.customers) {
                 renderables.push({
                     depth: a.x + a.y + 1,
-                    draw: () => {
-                        this.person(a, state.time);
-                        if (a.unserved) {
-                            const p = this.p(a.x + 0.5, a.y + 0.5, 48);
-                            this.ellipse(p.x, p.y, 9, 8, '#fff0cc');
-                            this.text('!', p.x, p.y + 4, 12, '#813e2d');
-                        }
-                    },
+                    draw: () => this.person(a, state.time),
                 });
             }
-            const staff = state.staff;
-            const distanceFromStockroom = Math.abs(staff.x - Store.DEPOT.x) + Math.abs(staff.y - Store.DEPOT.y);
-            // Extend the drawn route into the annex while the simulation uses the shop grid.
-            const visibleStaff = { ...staff, y: staff.y - 1.7 * Math.max(0, 1 - distanceFromStockroom) };
-            renderables.push({
-                depth: visibleStaff.x + visibleStaff.y + 1,
-                draw: () => this.person(visibleStaff, state.time, true),
+            Store.workers(state).forEach((staff, index) => {
+                const distance = Math.abs(staff.x - Store.DEPOT.x) + Math.abs(staff.y - Store.DEPOT.y);
+                // Extend the drawn route into the annex while the simulation uses the shop grid.
+                const nearDepot = Math.max(0, 1 - distance);
+                const visibleStaff = { ...staff, x: staff.x - index * 0.23 * nearDepot,
+                    y: staff.y - (1.7 - index * 0.45) * nearDepot };
+                renderables.push({
+                    depth: visibleStaff.x + visibleStaff.y + 1,
+                    draw: () => this.person(visibleStaff, state.time, true),
+                });
             });
-            renderables.push({ depth: 2.1, draw: () => this.plant(0.3, 0.8) });
             renderables.push({
                 depth: 8.5,
                 draw: () => {
@@ -794,8 +842,10 @@
                 });
             }
             if (draft && hover && Store.hasFloor(hover.x, hover.y, state.expanded)) {
-                const valid = (draft.id ? Store.movePlacement(state, draft.id, hover.x, hover.y, draft.rotated) :
-                    Store.placement(state, draft.type, hover.x, hover.y, draft.rotated)).ok,
+                const counter = draft.type === 'counter';
+                const valid = (counter ? Store.counterPlacement(state, hover.x, hover.y, draft.id) :
+                    draft.id ? Store.movePlacement(state, draft.id, hover.x, hover.y, draft.rotated) :
+                        Store.placement(state, draft.type, hover.x, hover.y, draft.rotated)).ok,
                     { w, h } = Store.sizeOf(draft);
                 this.surface(
                     hover.x,
@@ -807,12 +857,19 @@
                     valid ? '#397640' : '#a33c2e',
                     2.2,
                 );
+                if (counter) {
+                    for (const p of [{ x: hover.x, y: hover.y - 1 }, Store.checkoutCell(hover)]) {
+                        if (Store.hasFloor(p.x, p.y, state.expanded))
+                            this.surface(p.x, p.y, 1, 1, 1, '#80a9d36b', '#5284ae');
+                    }
+                }
                 renderables.push({
                     depth: hover.x + hover.y + (w + h) / 2,
                     draw: () => {
                         c.save();
                         c.globalAlpha = 0.6;
-                        this.building({ ...draft, x: hover.x, y: hover.y }, true);
+                        if (counter) this.counter(hover.x, hover.y);
+                        else this.building({ ...draft, x: hover.x, y: hover.y }, true);
                         c.restore();
                     },
                 });
@@ -821,9 +878,14 @@
             this.drawTraffic(state.time);
             this.drawPark();
             const showStock = !draft && !expansionPreview;
-            const inspected = showStock && (editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y)));
+            const inspected = showStock && (editing?.type ? editing : hover && Store.shelfAt(state.buildings, hover.x, hover.y));
             const stockShelf = this.stockPanelShelf(state, inspected, now);
             if (showStock) {
+                const occupied = [];
+                for (const customer of state.customers.slice().reverse()) {
+                    if (occupied.length >= 3) break;
+                    if (customer.moodUntil > state.time) this.customerBubble(customer, state.time, occupied);
+                }
                 for (const shelf of state.buildings) {
                     if (shelf === stockShelf) continue;
                     const anchor = this.stockAnchor(shelf);
@@ -852,9 +914,10 @@
             const r = new StoreRenderer(source);
             r.ctx.translate(140, 200);
             r.ctx.scale(1.7, 1.7);
-            const illustrated = r.building({ x: 0, y: 0, type }, true);
+            const illustrated = type === 'counter' ? r.counter(0, 0) : r.building({ x: 0, y: 0, type }, true);
             const hdBounds = StoreSprites.hasHDFurniture(type) && hdThumbnailBounds[type];
-            const [left, top, width, height] = hdBounds || thumbnailBounds[type][illustrated ? 0 : 1];
+            const [left, top, width, height] = type === 'counter' ? [86, 119, 164, 164] :
+                hdBounds || thumbnailBounds[type][illustrated ? 0 : 1];
             const sw = width + 4, sh = height + 4;
             const dpr = Math.min(devicePixelRatio || 1, 2);
             canvas.width = Math.round(144 * dpr);

@@ -39,7 +39,7 @@ test('a save resumes rotated shelves, paid goals, demand and active routes deter
 });
 
 test('an unreadable or newer save stays intact until an explicit restart', () => {
-    for (const raw of ['{broken', '{"version":3}']) {
+    for (const raw of ['{broken', '{"version":4}']) {
         const storage = memory(raw);
         const save = Save.open(storage);
         assert.equal(save.status, 'invalid');
@@ -49,6 +49,35 @@ test('an unreadable or newer save stays intact until an explicit restart', () =>
         assert.ok(save.write(Store.create(), 1, false, true));
         assert.deepEqual(Save.open(storage).loaded.state, Store.create());
     }
+});
+
+test('version 2 saves reopen with their in-flight customers assigned to the original checkouts', () => {
+    const state = Store.create();
+    for (let tick = 0; tick < 600 && !state.customers.some((a) => a.state === 'checkout'); tick++)
+        Store.step(state, 1 / 30);
+    const checkout = state.customers.find((a) => a.state === 'checkout');
+    assert.ok(checkout);
+    const id = checkout.checkoutId;
+    for (const a of state.customers) delete a.checkoutId;
+    for (const field of ['counters', 'helpers', 'payrollSpent', 'payrollDue']) delete state[field];
+    delete state.dayStart.payrollSpent;
+    const raw = JSON.stringify({ version: 2, speed: 1, paused: false, state });
+    const save = Save.open(memory(raw));
+    assert.equal(save.status, 'ready');
+    assert.equal(save.loaded.state.customers.find((a) => a.state === 'checkout').checkoutId, id);
+});
+
+test('checkout positions and hired employees survive saving', () => {
+    const state = Store.create();
+    state.money = 1800;
+    assert.ok(Store.placeCounter(state, 5, 3).ok);
+    assert.ok(Store.hireCashier(state, 3));
+    assert.ok(Store.hireHelper(state));
+    assert.ok(Store.placeCounter(state, 6, 4, 3).ok);
+    run(state, 20);
+    const storage = memory();
+    assert.ok(Save.open(storage).write(state, 1, true));
+    assert.deepEqual(Save.open(storage).loaded.state, { ...state, events: [] });
 });
 
 test('older saves migrate without inventing an earlier sales history', () => {

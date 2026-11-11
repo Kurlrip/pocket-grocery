@@ -2,7 +2,8 @@
     'use strict';
     const TILE = 64;
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    const stockHeights = { produce: 75, bakery: 75, dairy: 110, grocery: 95, flowers: 50 };
+    const stockHeights = { produce: 67, bakery: 61, dairy: 87, grocery: 66, flowers: 30 };
+    const stockAnchorGap = 7;
     // Framing rectangles in the thumbnail canvas, measured with and without the sprite atlas.
     const thumbnailBounds = {
         produce: [[91, 110, 156, 150], [91, 144, 152, 132]],
@@ -326,7 +327,7 @@
         drawStockGauge(shelf, anchor) {
             const width = 48, height = 12;
             const left = clamp(anchor.x - width / 2, 5, this.width - width - 5);
-            const top = Math.max(5, anchor.y - height - 9);
+            const top = Math.max(5, anchor.y - height - stockAnchorGap);
             const capacity = Store.CATALOG[shelf.type].capacity;
             const visible = this.stockAnimations.get(shelf.id)?.count ?? shelf.stock;
             const ratio = visible / capacity;
@@ -335,7 +336,7 @@
             c.translate((left - this.origin.x) / this.scale, (top - this.origin.y) / this.scale);
             c.scale(1 / this.scale, 1 / this.scale);
             const tail = clamp(anchor.x - left, 9, width - 9);
-            this.polygon([{ x: tail - 4, y: height - 1 }, { x: tail, y: height + 5 },
+            this.polygon([{ x: tail - 4, y: height - 1 }, { x: tail, y: height + 6 },
                 { x: tail + 4, y: height - 1 }], '#673c26', '#412a20', 1);
             c.beginPath();
             c.roundRect(0, 0, width, height, 5);
@@ -364,7 +365,7 @@
             const width = cols * cell + padding * 2;
             const height = Math.ceil(capacity / cols) * cell + 32;
             const left = clamp(sx - width / 2, 5, Math.max(5, this.width - width - 5));
-            const top = Math.max(5, sy - height - 9);
+            const top = Math.max(5, sy - height - stockAnchorGap);
             const animation = this.stockAnimations.get(shelf.id);
             const move = animation?.moves[0];
             const progress = move ? clamp((now - move.start) / (move.end - move.start), 0, 1) : 1;
@@ -385,7 +386,7 @@
             c.translate(0, height * (1 - openScale));
             c.scale(1, openScale);
             const tail = clamp(sx - left, 13, width - 13);
-            this.polygon([{ x: tail - 6, y: height - 1 }, { x: tail, y: height + 7 },
+            this.polygon([{ x: tail - 6, y: height - 1 }, { x: tail, y: height + 6 },
                 { x: tail + 6, y: height - 1 }], '#673c26', '#412a20', 1.2);
             const wood = c.createLinearGradient(0, 0, 0, height);
             wood.addColorStop(0, '#b27748');

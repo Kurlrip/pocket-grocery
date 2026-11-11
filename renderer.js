@@ -1,6 +1,7 @@
 (function (root) {
     'use strict';
     const TILE = 64;
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
     // Framing rectangles in the thumbnail canvas, measured with and without the sprite atlas.
     const thumbnailBounds = {
         produce: [[91, 110, 156, 150], [91, 144, 152, 132]],
@@ -27,6 +28,8 @@
             this.height = 0;
             this.zoom = 1;
             this.pan = { x: 0, y: 0 };
+            this.stockAnimations = new Map();
+            this.stockPanel = null;
             this.scale = 1;
             this.origin = { x: 0, y: 0 };
         }
@@ -278,31 +281,135 @@
             this.text(text, 0, 4, 5.3, color);
             c.restore();
         }
-        stockMeter(b) {
-            const ratio = clamp(b.stock / Store.CATALOG[b.type].capacity, 0, 1);
-            const { w, h } = Store.sizeOf(b);
-            const p = b.rotated
-                ? this.p(b.x + w, b.y + h * 0.6, 3)
-                : this.p(b.x + w * 0.6, b.y + h, 3);
-            const unit = 1 / this.scale;
-            const width = clamp(25 * this.scale, 19, 39) * unit;
-            const height = clamp(5 * this.scale, 5, 8) * unit;
-            const x = p.x - width / 2, y = p.y - height / 2;
-            const c = this.ctx;
-            c.beginPath();
-            c.roundRect(x, y, width, height, height / 2);
-            c.fillStyle = '#29404a';
-            c.fill();
-            c.lineWidth = unit;
-            c.strokeStyle = ratio === 0 ? '#fa927d' : '#fff2d9';
-            c.stroke();
-            if (ratio > 0) {
-                const fillWidth = Math.max(unit, (width - 2 * unit) * ratio);
-                c.beginPath();
-                c.roundRect(x + unit, y + unit, fillWidth, height - 2 * unit, height / 2);
-                c.fillStyle = ratio <= 0.25 ? '#ff947b' : ratio <= 0.5 ? '#ffc761' : '#a8dc72';
-                c.fill();
+        queueStock(shelf, previous) {
+            if (shelf.type !== 'produce') return;
+            const now = performance.now();
+            let animation = this.stockAnimations.get(shelf.id);
+            if (!animation) {
+                animation = { count: previous, moves: [], until: now };
+                this.stockAnimations.set(shelf.id, animation);
             }
+            const direction = Math.sign(shelf.stock - previous);
+            const duration = direction > 0 ? 64 : 155;
+            let start = Math.max(now, animation.moves.at(-1)?.end ?? now);
+            for (let count = previous; count !== shelf.stock; count += direction) {
+                animation.moves.push({ to: count + direction, start, end: start + duration });
+                start += duration;
+            }
+            animation.until = start + 1400;
+        }
+        drawStockCases(state, inspected, now) {
+            let recent = null, latest = 0;
+            for (const [id, animation] of this.stockAnimations) {
+                const shelf = state.buildings.find((b) => b.id === id);
+                if (!shelf || now >= animation.until) {
+                    this.stockAnimations.delete(id);
+                    continue;
+                }
+                while (animation.moves.length && now >= animation.moves[0].end)
+                    animation.count = animation.moves.shift().to;
+                if (animation.until > latest) {
+                    recent = shelf;
+                    latest = animation.until;
+                }
+            }
+            const shelf = inspected || recent;
+            if (shelf?.type !== 'produce') {
+                this.stockPanel = null;
+                return false;
+            }
+            const { w, h } = Store.sizeOf(shelf);
+            const point = this.p(shelf.x + w / 2, shelf.y + h / 2, 75);
+            const sx = this.origin.x + point.x * this.scale;
+            const sy = this.origin.y + point.y * this.scale;
+            if (sx < 0 || sx > this.width || sy > this.height || sy < -25) return false;
+
+            const capacity = Store.CATALOG.produce.capacity;
+            const cols = 10, cell = 14, padding = 8;
+            const width = cols * cell + padding * 2;
+            const height = Math.ceil(capacity / cols) * cell + 32;
+            const left = clamp(sx - width / 2, 5, Math.max(5, this.width - width - 5));
+            const top = Math.max(5, sy - height - 9);
+            const animation = this.stockAnimations.get(shelf.id);
+            const move = animation?.moves[0];
+            const progress = move ? clamp((now - move.start) / (move.end - move.start), 0, 1) : 1;
+            const visible = animation?.count ?? shelf.stock;
+            const movingSlot = move ? Math.min(visible, move.to) : -1;
+            const arriving = move && move.to > visible;
+
+            if (this.stockPanel?.id !== shelf.id) this.stockPanel = { id: shelf.id, openedAt: now };
+            const reduced = reducedMotion.matches;
+            const opening = reduced ? 1 : clamp((now - this.stockPanel.openedAt) / 130, 0, 1);
+            const closing = inspected || reduced ? 1 : clamp((latest - now) / 170, 0, 1);
+            const openScale = 0.86 + 0.14 * (1 - (1 - opening) ** 2);
+            const c = this.ctx;
+            c.save();
+            c.translate((left - this.origin.x) / this.scale, (top - this.origin.y) / this.scale);
+            c.scale(1 / this.scale, 1 / this.scale);
+            c.globalAlpha *= Math.min(opening, closing);
+            c.translate(0, height * (1 - openScale));
+            c.scale(1, openScale);
+            const tail = clamp(sx - left, 13, width - 13);
+            this.polygon([{ x: tail - 6, y: height - 1 }, { x: tail, y: height + 7 },
+                { x: tail + 6, y: height - 1 }], '#673c26', '#412a20', 1.2);
+            const wood = c.createLinearGradient(0, 0, 0, height);
+            wood.addColorStop(0, '#b27748');
+            wood.addColorStop(1, '#76472c');
+            c.beginPath();
+            c.roundRect(0, 0, width, height, 9);
+            c.fillStyle = wood;
+            c.fill();
+            c.strokeStyle = '#4d3022';
+            c.lineWidth = 1.5;
+            c.stroke();
+            c.beginPath();
+            c.roundRect(3, 3, width - 6, height - 6, 7);
+            c.strokeStyle = '#f6ca8b88';
+            c.lineWidth = 1;
+            c.stroke();
+            c.fillStyle = '#fff4d7';
+            c.font = 'bold 11px sans-serif';
+            c.textAlign = 'left';
+            c.fillText('Stock du primeur', padding, 17);
+            c.textAlign = 'right';
+            c.fillText(visible + ' / ' + capacity, width - padding, 17);
+
+            for (let slot = 0; slot < capacity; slot++) {
+                const x = padding + (slot % cols) * cell;
+                const y = 24 + Math.floor(slot / cols) * cell;
+                c.beginPath();
+                c.roundRect(x, y, cell - 2, cell - 2, 3);
+                c.fillStyle = '#583722';
+                c.fill();
+                c.strokeStyle = '#e2ae7960';
+                c.lineWidth = 0.75;
+                c.stroke();
+                if (slot < visible && (reduced || slot !== movingSlot)) this.drawStockApple(x + 6, y + 7);
+            }
+            if (move && !reduced) {
+                const x = padding + (movingSlot % cols) * cell + 6;
+                const y = 31 + Math.floor(movingSlot / cols) * cell;
+                if (arriving) {
+                    this.drawStockApple(x, y - 9 * (1 - progress) ** 2, 0.72 + 0.28 * progress);
+                } else {
+                    this.drawStockApple(x + 7 * progress, y - 13 * progress,
+                        1 + Math.sin(progress * Math.PI) * 0.22, 1 - progress);
+                }
+            }
+            c.restore();
+            return true;
+        }
+        drawStockApple(x, y, scale = 1, opacity = 1) {
+            const c = this.ctx;
+            c.save();
+            c.translate(x, y);
+            c.scale(scale, scale);
+            c.globalAlpha *= opacity;
+            this.ellipse(-1.5, 0, 2.9, 3.2, '#d64032');
+            this.ellipse(1.3, 0, 2.8, 3.2, '#f35943');
+            this.ellipse(-1.6, -1, 0.9, 0.7, '#ffb58a');
+            this.ellipse(1.15, -3.3, 1.8, 0.9, '#b4d16f');
+            c.restore();
         }
         counter(x, y) {
             if (
@@ -496,7 +603,7 @@
             StoreSprites.draw(c, 'street', 'car', p.x, p.y, 78, { height: 59, anchor: 0.82 });
             c.restore();
         }
-        render(state, hover, draft, editing) {
+        render(state, hover, draft, editing, now = performance.now()) {
             this.resize();
             const c = this.ctx;
             c.setTransform(this.canvas.width / this.width, 0, 0, this.canvas.height / this.height, 0, 0);
@@ -625,29 +732,28 @@
             renderables.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
             this.drawTraffic(state.time);
             this.drawPark();
-            for (const b of state.buildings) this.stockMeter(b);
-            if (!draft && !editing && hover) {
-                const b = Store.shelfAt(state.buildings, hover.x, hover.y);
-                if (b) {
-                    const d = Store.CATALOG[b.type],
-                        { w, h } = Store.sizeOf(b),
-                        p = this.p(b.x + w / 2, b.y + h / 2, 78);
-                    c.fillStyle = '#fffdf3';
-                    c.shadowColor = '#4c5c3320';
-                    c.shadowBlur = 12;
-                    c.beginPath();
-                    c.roundRect(p.x - 62, p.y - 24, 124, 43, 7);
-                    c.fill();
-                    c.shadowBlur = 0;
-                    this.text(d.name, p.x, p.y - 9, 10, '#3a5b42');
-                    this.text(
-                        `${b.stock} / ${d.capacity} en stock · ${d.price} €`,
-                        p.x,
-                        p.y + 5,
-                        8,
-                        '#869476',
-                    );
-                }
+            const inspected = editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y));
+            const casesOpen = !draft && this.drawStockCases(state, inspected, now);
+            if (!draft && !editing && inspected && !casesOpen) {
+                const b = inspected;
+                const d = Store.CATALOG[b.type],
+                    { w, h } = Store.sizeOf(b),
+                    p = this.p(b.x + w / 2, b.y + h / 2, 78);
+                c.fillStyle = '#fffdf3';
+                c.shadowColor = '#4c5c3320';
+                c.shadowBlur = 12;
+                c.beginPath();
+                c.roundRect(p.x - 62, p.y - 24, 124, 43, 7);
+                c.fill();
+                c.shadowBlur = 0;
+                this.text(d.name, p.x, p.y - 9, 10, '#3a5b42');
+                this.text(
+                    `${b.stock} / ${d.capacity} en stock · ${d.price} €`,
+                    p.x,
+                    p.y + 5,
+                    8,
+                    '#869476',
+                );
             }
             c.restore();
         }

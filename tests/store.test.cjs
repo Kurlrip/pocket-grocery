@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('../game-core.js');
-function run(s, seconds) {
-    for (let i = 0; i < seconds * 30; i++) S.step(s, 1 / 30);
+function run(s, seconds, onStockChange) {
+    for (let i = 0; i < seconds * 30; i++) S.step(s, 1 / 30, onStockChange);
 }
 
 test('routes use cardinal, walkable cells and avoid the initial furniture', () => {
@@ -126,6 +126,19 @@ test('an empty shop restocks itself and does not spend beyond available funds', 
     assert.ok(s.supplySpent > 0);
     assert.ok(s.served > 0);
     assert.ok(s.money >= 0);
+});
+
+test('stock changes report the exact units taken and restocked', () => {
+    const s = S.create();
+    const events = [];
+    const record = (shelf, before) => events.push([shelf.type, before, shelf.stock]);
+    s.buildings[0].stock = 8;
+    s.spawnTimer = Infinity;
+    run(s, 22, record);
+    assert.deepEqual(events, [['produce', 8, 20]]);
+    s.spawnTimer = 0;
+    run(s, 9, record);
+    assert.deepEqual(events[1], ['produce', 20, 19]);
 });
 
 test('building during active routes re-plans without stranding customers', () => {

@@ -336,7 +336,7 @@
         a.timer = missed ? 0.8 : 0;
         a.route = path(grid, from, ENTRANCE) || [];
     }
-    function step(s, dt) {
+    function step(s, dt, onStockChange) {
         if (!Number.isFinite(dt) || dt <= 0) return;
         s.time += dt;
         s.spawnTimer -= dt;
@@ -377,6 +377,7 @@
                     continue;
                 }
                 b.stock--;
+                onStockChange?.(b, b.stock + 1);
                 a.value = CATALOG[a.request].price;
                 a.state = 'checkout';
                 a.timer = 1.1;
@@ -412,6 +413,7 @@
                         config = CATALOG[b.type];
                     const units = Math.min(config.capacity - b.stock, Math.floor(s.money / config.supply));
                     b.stock += units;
+                    if (units) onStockChange?.(b, b.stock - units);
                     s.money -= units * config.supply;
                     s.supplySpent += units * config.supply;
                     a.state = 'return';

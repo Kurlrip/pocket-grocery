@@ -367,13 +367,14 @@
         toast(state.events.map((event) => event.text).join(' '), state.events.some((event) => event.kind === 'error'));
         state.events.length = 0;
     }
+    const animateStock = (shelf, previous) => renderer.queueStock(shelf, previous);
     function frame(now) {
         const elapsed = last ? Math.min((now - last) / 1000, 0.2) : 0;
         last = now;
         if (!paused && !document.hidden) {
             accumulator += elapsed * speed;
             while (accumulator >= 1 / 30) {
-                Store.step(state, 1 / 30);
+                Store.step(state, 1 / 30, animateStock);
                 accumulator -= 1 / 30;
             }
             uiClock += elapsed;
@@ -383,7 +384,7 @@
                 uiClock = 0;
             }
         }
-        renderer.render(state, hover || targetTile, selected && { type: selected, rotated }, editing);
+        renderer.render(state, hover || targetTile, selected && { type: selected, rotated }, editing, now);
         requestAnimationFrame(frame);
     }
     updateUI();

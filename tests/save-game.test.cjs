@@ -39,7 +39,7 @@ test('a save resumes rotated shelves, paid goals, demand and active routes deter
 });
 
 test('an unreadable or newer save stays intact until an explicit restart', () => {
-    for (const raw of ['{broken', '{"version":2}']) {
+    for (const raw of ['{broken', '{"version":3}']) {
         const storage = memory(raw);
         const save = Save.open(storage);
         assert.equal(save.status, 'invalid');
@@ -49,6 +49,36 @@ test('an unreadable or newer save stays intact until an explicit restart', () =>
         assert.ok(save.write(Store.create(), 1, false, true));
         assert.deepEqual(Save.open(storage).loaded.state, Store.create());
     }
+});
+
+test('older saves migrate without inventing an earlier sales history', () => {
+    const state = Store.create();
+    run(state, 210);
+    delete state.expanded;
+    delete state.dayStart;
+    delete state.lastDay;
+    const raw = JSON.stringify({ version: 1, speed: 2, paused: true, state });
+    const save = Save.open(memory(raw));
+    assert.equal(save.status, 'ready');
+    assert.equal(save.loaded.state.money, state.money);
+    assert.equal(save.loaded.state.expanded, false);
+    assert.equal(save.loaded.state.lastDay, null);
+    assert.equal(Store.dayReport(save.loaded.state).revenue, 0);
+    assert.equal(Store.dayReport(save.loaded.state).partial, true);
+});
+
+test('new saves preserve the extension, relocated shelves and the previous day', () => {
+    const state = Store.create();
+    state.money = 1300;
+    assert.ok(Store.expand(state).ok);
+    assert.ok(Store.moveShelf(state, 1, 10, 4).ok);
+    run(state, 200);
+    const storage = memory();
+    assert.ok(Save.open(storage).write(state, 3, true));
+    const resumed = Save.open(storage).loaded.state;
+    assert.deepEqual(resumed, { ...state, events: [] });
+    assert.ok(resumed.expanded);
+    assert.equal(resumed.lastDay.day, 1);
 });
 
 test('invalid route and shelf data are rejected before starting the simulation', () => {

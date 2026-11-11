@@ -203,6 +203,68 @@ test('rotation preserves the current movement segment and leads to a valid shelf
     assert.ok(s.demand.produce.sold > 0);
 });
 
+test('the extension is paid once and adds only the 15 connected floor cells', () => {
+    const s = S.create(), { x, y, cost } = S.EXPANSION;
+    assert.equal(S.placement(s, 'flowers', x, y).ok, false);
+    assert.equal(S.expand(s).ok, false);
+    s.money = cost + 480;
+    assert.equal(S.expand(s).ok, true);
+    assert.equal(S.expand(s).ok, false);
+    assert.equal(s.money, 480);
+    const before = S.gridFor(s.buildings), after = S.gridFor(s.buildings, true);
+    assert.equal(after.flat().filter((cell, i) => cell === 0 && before.flat()[i] === -2).length, 15);
+    assert.ok(S.path(after, S.ENTRANCE, { x: x + 2, y }).length > 0);
+    assert.equal(S.placement(s, 'flowers', x, y - 1).ok, false);
+});
+
+test('placement keeps an entrance open even before the extension has a shelf', () => {
+    const s = S.create();
+    s.money = 5000;
+    assert.ok(S.expand(s).ok);
+    for (let y = 3; y < 7; y++) assert.ok(S.place(s, 'flowers', 10, y).ok);
+    assert.match(S.placement(s, 'flowers', 10, 7).reason, /passage/);
+});
+
+test('moving a stocked shelf into the extension is free and preserves active routes', () => {
+    const s = S.create();
+    s.money = 1200;
+    assert.ok(S.expand(s).ok);
+    run(s, 2);
+    const shelf = s.buildings[0], stock = shelf.stock, money = s.money;
+    const customer = s.customers.find((a) => a.target === shelf.id);
+    const next = customer.route[0];
+    assert.equal(S.moveShelf(s, shelf.id, S.CHECKOUT.x, S.CHECKOUT.y).ok, false);
+    assert.equal(S.moveShelf(s, shelf.id, 10, 4, true).ok, true);
+    assert.equal(shelf.stock, stock);
+    assert.equal(s.money, money);
+    assert.equal(S.shelfAt(s.buildings, 10, 5), shelf);
+    assert.deepEqual(customer.route[0], next);
+    run(s, 30);
+    assert.ok(s.demand.produce.sold > 0);
+});
+
+test('the previous day is frozen and the new day reports only its own activity', () => {
+    const s = S.create();
+    run(s, 185);
+    const yesterday = structuredClone(s.lastDay);
+    assert.equal(yesterday.day, 1);
+    assert.ok(yesterday.revenue > 0);
+    assert.ok(yesterday.products.some((p) => p.missed > 0));
+    run(s, 30);
+    assert.deepEqual(s.lastDay, yesterday);
+    const today = S.dayReport(s);
+    assert.equal(today.day, 2);
+    assert.equal(today.revenue + yesterday.revenue, s.revenue);
+    assert.equal(today.supplySpent + yesterday.supplySpent, s.supplySpent);
+    for (const product of today.products) {
+        const previous = yesterday.products.find((p) => p.type === product.type);
+        assert.deepEqual(s.demand[product.type], {
+            sold: product.sold + previous.sold,
+            missed: product.missed + previous.missed,
+        });
+    }
+});
+
 test('the same fixed steps reproduce the same economy and agents', () => {
     const a = S.create(),
         b = S.create();

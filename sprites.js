@@ -35,6 +35,14 @@
             cashier: [747, 23, 147, 245],
             employee: [914, 20, 146, 250],
         },
+        'people-floor': {
+            shopper0: [2, 2, 216, 328],
+            shopper1: [222, 2, 216, 328],
+            shopper2: [442, 2, 216, 328],
+            shopper3: [2, 334, 216, 328],
+            cashier: [222, 334, 216, 328],
+            employee: [442, 334, 216, 328],
+        },
         street: {
             fountain: [12, 12, 195, 232],
             car: [268, 12, 232, 202],
@@ -78,8 +86,10 @@
     );
     function draw(ctx, sheet, name, x, y, width, { anchor = 0.9, height, flip = false, floorSlope } = {}) {
         const hd = sheet === 'furniture' && hdFurnitureFrame(name);
-        const image = hd ? images['furniture-hd-v2'] : images[sheet],
-            frame = hd || frames[sheet][name];
+        const grounded = sheet === 'people' && images['people-floor'] && frames['people-floor'][name];
+        const art = hd ? 'furniture-hd-v2' : grounded ? 'people-floor' : sheet;
+        const image = images[art],
+            frame = frames[art][name];
         if (!image || !frame) return false;
         const [, , w, h] = frame;
         height ??= (width * h) / w;
@@ -96,7 +106,7 @@
         }
         if (flip) ctx.scale(-1, 1);
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(image, ...frame, -width / 2, -height * (layout?.anchor ?? anchor), width, height);
+        ctx.drawImage(image, ...frame, -width / 2, -height * (layout?.anchor ?? (grounded ? 0.99 : anchor)), width, height);
         ctx.restore();
         return true;
     }

@@ -30,7 +30,9 @@
                 <canvas id="gameCanvas" tabindex="0"
                     aria-label="Magasin. Zoomez à la molette ou en pinçant l’écran. Pour construire, sélectionnez un rayon puis touchez ou cliquez sur une case libre."></canvas>
                 <div class="scene-toolbar">
-                    <div class="scene-status"><span id="day"></span><span id="openText"></span></div>
+                    <div class="scene-status">
+                        <button id="day" data-panel="report" aria-haspopup="dialog" title="Ouvrir le bilan"></button><span id="openText"></span>
+                    </div>
                     <div class="time-controls" role="group" aria-label="Vitesse du jeu">
                         <button id="pauseButton" class="small-button" aria-label="Pause" title="Pause"></button>
                         <button class="small-button active" data-speed="1" aria-pressed="true">×1</button>
@@ -51,7 +53,16 @@
                         <button id="rotateButton" class="small-button">Tourner</button>
                         <button id="placeButton" class="small-button active">Poser</button>
                         <button id="removeButton" class="small-button" hidden>Retirer</button>
+                        <button id="moveButton" class="small-button" hidden>Déplacer</button>
                         <button id="cancelButton" class="small-button">Annuler</button>
+                    </div>
+                </div>
+                <div id="expansionPreview" class="placement" hidden>
+                    <span class="art" data-art="build" aria-hidden="true">▤</span>
+                    <div class="placement-copy"><strong>Extension du magasin</strong><small id="expansionPrice"></small></div>
+                    <div class="placement-actions">
+                        <button id="buyExpansionButton" class="small-button active">Agrandir</button>
+                        <button id="cancelExpansionButton" class="small-button">Annuler</button>
                     </div>
                 </div>
             </section>
@@ -76,11 +87,13 @@
             </header>
             <div class="panel-body">
                 <section id="construction" hidden>
+                    <button id="expansionButton" class="small-button expansion-button"></button>
                     <p class="panel-note">Les ventes et les demandes manquées sont comptées depuis l’ouverture. Premier stock inclus.</p>
                     <p id="catalogFeedback" role="status" class="catalog-feedback" hidden></p>
                     <div id="catalog" class="catalog"></div>
                 </section>
                 <section id="objectives" hidden><div id="goals"></div></section>
+                <section id="report" hidden></section>
                 <section id="controls" hidden>
                     <section class="save-options" aria-label="Sauvegarde">
                         <p id="saveStatus" role="status"></p>
@@ -95,7 +108,8 @@
                         <summary>Comment jouer</summary>
                         <ol>
                             <li>Dans <b>Construire</b>, choisissez un rayon. Sur téléphone, touchez une case pour afficher l’aperçu, puis appuyez sur <b>Poser</b>. Sur PC, un clic pose le rayon.</li>
-                            <li>Hors construction, touchez ou cliquez à la base d’un rayon pour le tourner ou le retirer.</li>
+                            <li>Hors construction, touchez ou cliquez à la base d’un rayon pour le déplacer, le tourner ou le retirer.</li>
+                            <li>Le bouton du jour ouvre le bilan des ventes et du réassort.</li>
                             <li>Chaque client cherche un produit. Consultez les demandes manquées dans <b>Construire</b>. Votre employé réapprovisionne les rayons.</li>
                             <li>Remplissez les objectifs pour gagner des primes.</li>
                         </ol>

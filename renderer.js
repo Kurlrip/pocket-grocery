@@ -133,7 +133,7 @@
             this.surface(x + 0.12, y + 0.12, w + 0.05, h + 0.12, 0.2, '#354a3422');
         }
         sprite(sheet, name, x, y, width, options) {
-            const p = this.p(x, y);
+            const p = this.p(x, y, options?.z);
             return StoreSprites.draw(this.ctx, sheet, name, p.x, p.y, width, options);
         }
         plant(x, y, big = false) {
@@ -528,6 +528,7 @@
             const next = a.route?.[0];
             const bob = next ? Math.abs(Math.sin(time * 10 + (a.color || 0))) * 2 : 0;
             const name = cashier ? 'cashier' : staff ? 'employee' : `shopper${(a.color || 0) % 4}`;
+            this.ellipse(p.x, p.y, name === 'shopper3' ? 12 : 8, 3.2, '#3f382831');
             if (
                 StoreSprites.draw(c, 'people', name, p.x, p.y - bob, 29, {
                     height: 44,
@@ -542,7 +543,6 @@
                 return;
             }
             const walk = a.route?.length ? Math.sin(time * 11 + a.color) * 2 : 0;
-            this.ellipse(p.x, p.y, 8, 3.8, '#4b53352b');
             const shirt = staff
                 ? '#7d9a68'
                 : ['#b4856a', '#c9a264', '#8aa6a5', '#b58a9c', '#788da3'][a.color || 0];
@@ -639,6 +639,21 @@
                 this.surface(4.04, y, 1.03, 0.17, -22, '#fff2db');
             this.surface(4.12, 10, 0.75, 1.55, -10, '#f7e1b0');
         }
+        drawExpansion(open) {
+            const { x, y, w, h } = Store.EXPANSION;
+            if (open) this.box(x, y, w, h, -15, 15, '#efd9b9', '#c99772', '#ac7a57');
+            for (let row = y; row < y + h; row++) {
+                for (let column = x; column < x + w; column++) {
+                    this.surface(column, row, 1, 1, 0.2,
+                        open ? ((column + row) % 2 ? '#ecd3ac' : '#f5e1c0') : '#ffe2a465',
+                        open ? '#bc91695e' : '#a66e35');
+                }
+            }
+            if (open) {
+                this.line(this.p(x, y, 1), this.p(x + w, y, 1), '#a67556', 2);
+                this.line(this.p(x + w, y, 1), this.p(x + w, y + h, 1), '#a67556', 2);
+            }
+        }
         drawPark() {
             this.box(3.5, 14.38, 7.3, 3.8, -27, 9, '#9fbe60', '#729346', '#587843');
             this.surface(4.04, 14.38, 1.03, 1.4, -17, '#ead5a8');
@@ -647,13 +662,13 @@
             this.ellipse(fountain.x, fountain.y, 36, 16, '#c8b28a');
             StoreSprites.draw(this.ctx, 'street', 'fountain', fountain.x, fountain.y, 64, { anchor: 0.82 });
             for (const [name, x, y, width] of [
-                ['hedge', 5.7, 14.82, 79],
-                ['shrub', 5.15, 17.1, 53],
-                ['blossom', 10.32, 15.12, 96],
-                ['bench', 9.52, 16.67, 55],
-                ['tree', 10.3, 17.56, 98],
+                ['shrub', 5.65, 15.55, 45],
+                ['bench', 4.45, 17.13, 52],
+                ['hedge', 6.8, 17.56, 62],
+                ['blossom', 10.2, 16.45, 86],
+                ['tree', 10.25, 17.72, 92],
             ]) {
-                this.sprite('furniture', name, x, y, width);
+                this.sprite('furniture', name, x, y, width, { z: -18, flip: name === 'hedge' });
             }
         }
         drawTraffic(time) {
@@ -667,7 +682,7 @@
             StoreSprites.draw(c, 'street', 'car', p.x, p.y, 78, { height: 59, anchor: 0.82 });
             c.restore();
         }
-        render(state, hover, draft, editing, now = performance.now()) {
+        render(state, hover, draft, editing, now = performance.now(), expansionPreview = false) {
             this.resize();
             const c = this.ctx;
             c.setTransform(this.canvas.width / this.width, 0, 0, this.canvas.height / this.height, 0, 0);
@@ -687,6 +702,7 @@
             }
             this.drawStockroom();
             this.box(0, 0, 10, 10, -15, 15, '#f9dfc4', '#c99772', '#ac7a57');
+            if (state.expanded || expansionPreview) this.drawExpansion(state.expanded);
             for (let y = 0; y < 10; y++)
                 for (let x = 0; x < 10; x++) {
                     this.surface(x, y, 1, 1, 0.1, (x + y) % 2 ? '#f1d1ad' : '#f8dfc3', '#bc91695e');
@@ -699,7 +715,16 @@
             this.surface(4.04, 9.55, 0.92, 0.46, 0.2, '#855145', '#b47e60');
             const renderables = state.buildings.map((b) => ({
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
-                draw: () => this.building(b),
+                draw: () => {
+                    if (draft?.id !== b.id) {
+                        this.building(b);
+                        return;
+                    }
+                    c.save();
+                    c.globalAlpha = 0.45;
+                    this.building(b, true);
+                    c.restore();
+                },
             }));
             const cashierOffset = StoreSprites.hasHDFurniture('counter') ? 0.35 : 0;
             for (const { x, y } of Store.COUNTERS) {
@@ -713,13 +738,13 @@
                 });
             }
             for (const [name, x, y, width] of [
-                ['planter', 3.18, 10.25, 30],
-                ['chalkboard', 5.24, 10.58, 29],
-                ['planter', 7.72, 10.47, 34],
+                ['planter', 2.25, 10.91, 30],
+                ['chalkboard', 5.4, 10.93, 22],
+                ['planter', 7.82, 10.92, 32],
             ]) {
                 const p = this.p(x, y, -10);
                 renderables.push({
-                    depth: x + y + 1,
+                    depth: 22 + x / 20,
                     draw: () => StoreSprites.draw(c, 'street', name, p.x, p.y, width),
                 });
             }
@@ -757,21 +782,20 @@
             renderables.push({ depth: 21, draw: () => this.frontGlass() });
             for (const [name, x, y, width] of [
                 ['blossom', 0.05, 10.8, 76],
-                ['bench', 2.35, 10.65, 57],
-                ['lamp', 3.45, 11.21, 23],
-                ['lamp', 5.63, 11.21, 23],
-                ['shrub', 6.73, 10.62, 42],
-                ['tree', 10.5, 10.65, 105],
+                ['lamp', 3.18, 11.27, 22],
+                ['lamp', 6.56, 11.27, 22],
+                ['tree', 10.19, 10.89, 96],
             ]) {
                 renderables.push({
-                    depth: x + y + 1,
+                    depth: 22 + x / 20,
                     draw: () => {
-                        if (!this.sprite('furniture', name, x, y, width)) this.plant(x, y);
+                        if (!this.sprite('furniture', name, x, y, width, { z: -11 })) this.plant(x, y);
                     },
                 });
             }
-            if (draft && hover && hover.x >= 0 && hover.y >= 0 && hover.x < 10 && hover.y < 10) {
-                const valid = Store.placement(state, draft.type, hover.x, hover.y, draft.rotated).ok,
+            if (draft && hover && Store.hasFloor(hover.x, hover.y, state.expanded)) {
+                const valid = (draft.id ? Store.movePlacement(state, draft.id, hover.x, hover.y, draft.rotated) :
+                    Store.placement(state, draft.type, hover.x, hover.y, draft.rotated)).ok,
                     { w, h } = Store.sizeOf(draft);
                 this.surface(
                     hover.x,
@@ -796,16 +820,17 @@
             renderables.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
             this.drawTraffic(state.time);
             this.drawPark();
-            const inspected = !draft && (editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y)));
+            const showStock = !draft && !expansionPreview;
+            const inspected = showStock && (editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y)));
             const stockShelf = this.stockPanelShelf(state, inspected, now);
-            if (!draft) {
+            if (showStock) {
                 for (const shelf of state.buildings) {
                     if (shelf === stockShelf) continue;
                     const anchor = this.stockAnchor(shelf);
                     if (anchor) this.drawStockGauge(shelf, anchor);
                 }
             }
-            const panelAnchor = !draft && stockShelf && this.stockAnchor(stockShelf);
+            const panelAnchor = showStock && stockShelf && this.stockAnchor(stockShelf);
             if (panelAnchor) this.drawStockCases(stockShelf, panelAnchor, inspected, now);
             else this.stockPanel = null;
             c.restore();

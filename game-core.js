@@ -1,6 +1,9 @@
 (function (root) {
     'use strict';
     const SIZE = 10;
+    const EXPANSION = { x: SIZE, y: 3, w: 3, h: 5, cost: 650 };
+    const WIDTH = SIZE + EXPANSION.w;
+    const DAY_LENGTH = 180;
     const ENTRANCE = { x: 4, y: 9 };
     const COUNTERS = [
         { x: 1, y: 7 },
@@ -88,7 +91,10 @@
     const key = (p) => `${p.x},${p.y}`;
     const same = (a, b) => a.x === b.x && a.y === b.y;
     const inside = (p) =>
-        Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < SIZE && p.y < SIZE;
+        Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < WIDTH && p.y < SIZE;
+    function hasFloor(x, y, expanded) {
+        return inside({ x, y }) && (x < SIZE || (expanded && y >= EXPANSION.y && y < EXPANSION.y + EXPANSION.h));
+    }
     function sizeOf({ type, rotated }) {
         const { w, h } = CATALOG[type].size;
         return rotated ? { w: h, h: w } : { w, h };
@@ -99,8 +105,9 @@
             return x >= b.x && x < b.x + w && y >= b.y && y < b.y + h;
         });
     }
-    function gridFor(buildings) {
-        const grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+    function gridFor(buildings, expanded = false) {
+        const grid = Array.from({ length: SIZE }, (_, y) =>
+            Array.from({ length: WIDTH }, (_, x) => hasFloor(x, y, expanded) ? 0 : -2));
         // Counter and the cashier's standing position.
         for (const { x, y } of COUNTERS) grid[y][x] = grid[y][x + 1] = grid[y - 1][x] = -1;
         for (const b of buildings) {
@@ -154,7 +161,7 @@
         return best;
     }
     function create() {
-        return {
+        const state = {
             money: 480,
             served: 0,
             revenue: 0,
@@ -162,6 +169,8 @@
             demand: Object.fromEntries(productTypes.map((type) => [type, { sold: 0, missed: 0 }])),
             time: 0,
             spawnTimer: 1,
+            expanded: false,
+            lastDay: null,
             nextId: 6,
             goal: 0,
             completed: GOALS.map(() => false),
@@ -176,6 +185,31 @@
             staff: { x: DEPOT.x, y: DEPOT.y, route: [], state: 'idle', target: null, timer: 0 },
             events: [],
             rng: 82317,
+        };
+        state.dayStart = daySnapshot(state);
+        return state;
+    }
+    function dayOf(s) {
+        return Math.floor(s.time / DAY_LENGTH) + 1;
+    }
+    function daySnapshot(s) {
+        return {
+            revenue: s.revenue,
+            supplySpent: s.supplySpent,
+            demand: Object.fromEntries(productTypes.map((type) => [type, { ...s.demand[type] }])),
+        };
+    }
+    function dayReport(s, day = dayOf(s)) {
+        return {
+            day,
+            partial: !!s.dayStart.partial,
+            revenue: s.revenue - s.dayStart.revenue,
+            supplySpent: s.supplySpent - s.dayStart.supplySpent,
+            products: productTypes.map((type) => ({
+                type,
+                sold: s.demand[type].sold - s.dayStart.demand[type].sold,
+                missed: s.demand[type].missed - s.dayStart.demand[type].missed,
+            })),
         };
     }
     function random(s) {
@@ -200,8 +234,8 @@
     function validateLayout(s, candidate, replace = false) {
         const { x, y, id } = candidate;
         const buildings = replace ? s.buildings.filter((b) => b.id !== id) : s.buildings;
-        const grid = gridFor(buildings), size = sizeOf(candidate);
-        if (x < 0 || y < 0 || x + size.w > SIZE || y + size.h > SIZE)
+        const grid = gridFor(buildings, s.expanded), size = sizeOf(candidate);
+        if (x < 0 || y < 0 || x + size.w > WIDTH || y + size.h > SIZE)
             return { ok: false, reason: 'Le rayon doit rester dans le magasin.' };
         const protectedCells = [ENTRANCE, ...CHECKOUTS, DEPOT];
         for (const a of [...s.customers, s.staff]) {
@@ -213,6 +247,8 @@
         }
         for (let iy = y; iy < y + size.h; iy++)
             for (let ix = x; ix < x + size.w; ix++) {
+                if (!hasFloor(ix, iy, s.expanded))
+                    return { ok: false, reason: 'Le rayon doit rester dans le magasin.' };
                 if (grid[iy][ix] !== 0 || protectedCells.some((p) => p.x === ix && p.y === iy))
                     return { ok: false, reason: 'Cette case est occupée. Gardez les passages libres.' };
                 grid[iy][ix] = id;
@@ -227,6 +263,8 @@
         }
         if (
             targets.some((p) => !connected.has(key(p))) ||
+            (s.expanded && !Array.from({ length: EXPANSION.h }, (_, row) =>
+                connected.has(key({ x: EXPANSION.x, y: EXPANSION.y + row }))).some(Boolean)) ||
             all.some((b) => !serviceCells(b, grid).some((p) => connected.has(key(p))))
         ) {
             return { ok: false, reason: 'Ce rayon bloquerait un passage. Laissez une allée accessible.' };
@@ -277,18 +315,37 @@
     function rotate(s, id) {
         const shelf = s.buildings.find((b) => b.id === id);
         if (!shelf) return { ok: false, reason: 'Ce rayon a déjà été retiré.' };
-        const candidate = { ...shelf, rotated: !shelf.rotated };
-        const result = validateLayout(s, candidate, true);
+        return moveShelf(s, id, shelf.x, shelf.y, !shelf.rotated);
+    }
+    function movePlacement(s, id, x, y, rotated) {
+        const shelf = s.buildings.find((b) => b.id === id);
+        if (!shelf) return { ok: false, reason: 'Ce rayon a déjà été retiré.' };
+        if (!Number.isInteger(x) || !Number.isInteger(y))
+            return { ok: false, reason: 'Choisissez une case dans le magasin.' };
+        return validateLayout(s, { ...shelf, x, y, rotated: rotated ?? !!shelf.rotated }, true);
+    }
+    function moveShelf(s, id, x, y, rotated) {
+        const result = movePlacement(s, id, x, y, rotated);
         if (!result.ok) return result;
-        shelf.rotated = candidate.rotated;
+        const shelf = s.buildings.find((b) => b.id === id);
+        Object.assign(shelf, result.candidate);
         updateRoutes(s, result.grid, id);
+        return { ok: true };
+    }
+    function expand(s) {
+        if (s.expanded) return { ok: false, reason: 'L’extension est déjà ouverte.' };
+        if (s.money < EXPANSION.cost) return { ok: false, reason: 'La caisse ne couvre pas encore le prix de l’extension.' };
+        s.money -= EXPANSION.cost;
+        s.expanded = true;
+        updateRoutes(s, gridFor(s.buildings, true));
+        notify(s, 'Extension ouverte. Vous avez 15 cases de plus !', 'success');
         return { ok: true };
     }
     function remove(s, id) {
         const index = s.buildings.findIndex((b) => b.id === id);
         if (index === -1) return false;
         s.buildings.splice(index, 1);
-        updateRoutes(s, gridFor(s.buildings), id);
+        updateRoutes(s, gridFor(s.buildings, s.expanded), id);
         return true;
     }
     function move(a, dt, speed) {
@@ -338,9 +395,10 @@
     }
     function step(s, dt, onStockChange) {
         if (!Number.isFinite(dt) || dt <= 0) return;
+        const day = dayOf(s);
         s.time += dt;
         s.spawnTimer -= dt;
-        const grid = gridFor(s.buildings);
+        const grid = gridFor(s.buildings, s.expanded);
         if (s.spawnTimer <= 0) {
             s.spawnTimer = 3.5;
             if (s.customers.length < 9) {
@@ -425,9 +483,16 @@
             }
         }
         checkGoals(s);
+        if (dayOf(s) !== day) {
+            s.lastDay = dayReport(s, day);
+            s.dayStart = daySnapshot(s);
+        }
     }
     const api = {
         SIZE,
+        WIDTH,
+        DAY_LENGTH,
+        EXPANSION,
         ENTRANCE,
         CHECKOUT,
         COUNTERS,
@@ -436,12 +501,19 @@
         GOALS,
         create,
         gridFor,
+        hasFloor,
         sizeOf,
         shelfAt,
         path,
         serviceCells,
         placement,
         place,
+        movePlacement,
+        moveShelf,
+        expand,
+        dayOf,
+        daySnapshot,
+        dayReport,
         rotate,
         remove,
         step,

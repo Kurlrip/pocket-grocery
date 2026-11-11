@@ -28,6 +28,12 @@
             employee: [914, 20, 146, 250],
         },
         buildings: { storefront: [29, 81, 278, 221] },
+        street: {
+            fountain: [12, 12, 195, 232],
+            car: [268, 12, 232, 202],
+            planter: [12, 268, 232, 230],
+            chalkboard: [268, 268, 208, 232],
+        },
     };
     // Ground-edge slopes measured on the source sprites after mirroring.
     const furnitureSlopes = {
@@ -47,7 +53,7 @@
                         resolve();
                     };
                     image.onerror = resolve;
-                    image.src = `assets/commerce-${name}.png`;
+                    image.src = `assets/commerce-${name}.${name === 'street' ? 'webp' : 'png'}`;
                 }),
         ),
     );

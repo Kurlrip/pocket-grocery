@@ -2,7 +2,12 @@
     'use strict';
     const SIZE = 10;
     const ENTRANCE = { x: 4, y: 9 };
-    const CHECKOUT = { x: 3, y: 7 };
+    const COUNTERS = [
+        { x: 1, y: 7 },
+        { x: 6, y: 8 },
+    ];
+    const CHECKOUTS = COUNTERS.map(({ x, y }) => ({ x: x + 2, y }));
+    const CHECKOUT = CHECKOUTS[0];
     const DEPOT = { x: 8, y: 0 };
     const CATALOG = {
         produce: {
@@ -66,10 +71,10 @@
         },
         {
             title: 'Un peu de tout',
-            text: 'Proposer 3 rayons différents',
+            text: 'Proposer 5 rayons différents',
             reward: 180,
             progress: (s) => new Set(s.buildings.map((b) => b.type)).size,
-            total: 3,
+            total: 5,
         },
         {
             title: 'Le cœur du quartier',
@@ -86,7 +91,7 @@
     function gridFor(buildings) {
         const grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
         // Counter and the cashier's standing position.
-        grid[7][1] = grid[7][2] = grid[6][1] = -1;
+        for (const { x, y } of COUNTERS) grid[y][x] = grid[y][x + 1] = grid[y - 1][x] = -1;
         for (const b of buildings) {
             const size = CATALOG[b.type].size;
             for (let y = b.y; y < b.y + size.h; y++)
@@ -145,12 +150,15 @@
             supplySpent: 0,
             time: 0,
             spawnTimer: 1,
-            nextId: 3,
+            nextId: 6,
             goal: 0,
             completed: GOALS.map(() => false),
             buildings: [
                 { id: 1, type: 'produce', x: 3, y: 3, stock: 20 },
                 { id: 2, type: 'bakery', x: 6, y: 5, stock: 18 },
+                { id: 3, type: 'dairy', x: 0, y: 1, stock: CATALOG.dairy.capacity },
+                { id: 4, type: 'grocery', x: 4, y: 0, stock: CATALOG.grocery.capacity },
+                { id: 5, type: 'grocery', x: 7, y: 2, stock: CATALOG.grocery.capacity },
             ],
             customers: [],
             staff: { x: DEPOT.x, y: DEPOT.y, route: [], state: 'idle', target: null, timer: 0 },
@@ -176,7 +184,7 @@
             size = config.size;
         if (x < 0 || y < 0 || x + size.w > SIZE || y + size.h > SIZE)
             return { ok: false, reason: 'Le rayon doit rester dans le magasin.' };
-        const protectedCells = [ENTRANCE, CHECKOUT, DEPOT];
+        const protectedCells = [ENTRANCE, ...CHECKOUTS, DEPOT];
         for (const a of [...s.customers, s.staff]) {
             protectedCells.push(
                 { x: Math.floor(a.x), y: Math.floor(a.y) },
@@ -193,7 +201,7 @@
         const candidate = { id: s.nextId, type, x, y },
             all = [...s.buildings, candidate];
         const connected = reachable(grid, ENTRANCE);
-        const targets = [CHECKOUT, DEPOT];
+        const targets = [...CHECKOUTS, DEPOT];
         for (const a of [...s.customers, s.staff]) {
             targets.push(a.route.at(-1) || { x: Math.round(a.x), y: Math.round(a.y) });
             if (a.route[0]) targets.push(a.route[0]);
@@ -288,7 +296,7 @@
                 }
                 a.state = 'checkout';
                 a.timer = 1.1;
-                a.route = path(grid, from, CHECKOUT) || [];
+                a.route = nearestRoute(grid, from, CHECKOUTS) || [];
             } else if (a.state === 'checkout') {
                 if (a.value > 0) {
                     s.money += a.value;
@@ -340,6 +348,7 @@
         SIZE,
         ENTRANCE,
         CHECKOUT,
+        COUNTERS,
         DEPOT,
         CATALOG,
         GOALS,

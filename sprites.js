@@ -29,6 +29,14 @@
         },
         buildings: { storefront: [29, 81, 278, 221] },
     };
+    // Ground-edge slopes measured on the source sprites after mirroring.
+    const furnitureSlopes = {
+        produce: [0.25, -0.56],
+        bakery: [0.24, -0.61],
+        dairy: [0.22, -0.63],
+        grocery: [0.24, -0.56],
+        counter: [0.23, -0.52],
+    };
     const ready = Promise.all(
         Object.keys(frames).map(
             (name) =>
@@ -43,7 +51,7 @@
                 }),
         ),
     );
-    function draw(ctx, sheet, name, x, y, width, { anchor = 0.9, height, flip = false } = {}) {
+    function draw(ctx, sheet, name, x, y, width, { anchor = 0.9, height, flip = false, floorSlope } = {}) {
         const image = images[sheet],
             frame = frames[sheet][name];
         if (!image || !frame) return false;
@@ -51,7 +59,16 @@
         height ??= (width * h) / w;
         ctx.save();
         ctx.translate(x, y);
+        const slopes = sheet === 'furniture' && flip && furnitureSlopes[name];
+        if (slopes && floorSlope) {
+            const [front, side] = slopes;
+            const verticalScale = (2 * floorSlope) / (front - side);
+            const shear = floorSlope - front * verticalScale;
+            // Keep the ground pivot fixed and all vertical edges vertical.
+            ctx.transform(1, shear, 0, verticalScale, 0, 0);
+        }
         if (flip) ctx.scale(-1, 1);
+        ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(image, ...frame, -width / 2, -height * anchor, width, height);
         ctx.restore();
         return true;

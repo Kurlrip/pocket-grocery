@@ -22,11 +22,11 @@ test('routes use cardinal, walkable cells and avoid the initial furniture', () =
 
 test('building charges exactly once, and rejection does not mutate the state', () => {
     const s = S.create();
-    assert.equal(S.place(s, 'dairy', 6, 2).ok, true);
-    assert.equal(s.money, 480 - 280 + 180); // Third category earns its goal reward.
-    assert.equal(s.buildings.at(-1).stock, S.CATALOG.dairy.capacity);
+    assert.equal(S.place(s, 'flowers', 5, 7).ok, true);
+    assert.equal(s.money, 480 - S.CATALOG.flowers.cost + 180);
+    assert.equal(s.buildings.at(-1).stock, S.CATALOG.flowers.capacity);
     const before = JSON.stringify(s);
-    assert.equal(S.place(s, 'dairy', 6, 2).ok, false);
+    assert.equal(S.place(s, 'flowers', 5, 7).ok, false);
     assert.equal(JSON.stringify(s), before);
 });
 

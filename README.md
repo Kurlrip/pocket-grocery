@@ -11,7 +11,7 @@ python -m http.server 8080
 # http://localhost:8080
 ```
 
-- Départ : 480 €, un primeur, un fournil, une caisse et un employé.
+- Départ avec 480 €, cinq meubles de vente, deux caisses et un employé de réassort.
 - Choisir un rayon dans le catalogue, puis une case libre. Vert : placement possible ; rouge : refusé. Un premier stock est inclus dans le prix.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
 - L'employé réapprovisionne les rayons sous la moitié de leur capacité. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.

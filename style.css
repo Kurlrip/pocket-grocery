@@ -1004,3 +1004,17 @@ dialog li {
         display: none;
     }
 }
+.scene-panel {
+    border-color: #435a71;
+}
+.scene-heading h2 {
+    color: #fff3df;
+}
+.scene-heading h2 > span,
+.scene-heading .eyebrow,
+.scene-meta,
+.scene-meta .weather > span,
+.scene-hint,
+.storefront figcaption {
+    color: #e2ebf3;
+}

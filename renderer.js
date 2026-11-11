@@ -12,7 +12,7 @@
         }
         resize() {
             const r = this.canvas.getBoundingClientRect(),
-                dpr = Math.min(devicePixelRatio || 1, 2);
+                dpr = Math.max(1, devicePixelRatio || 1);
             if (this.width !== r.width || this.height !== r.height || this.dpr !== dpr) {
                 this.width = r.width;
                 this.height = r.height;
@@ -20,8 +20,8 @@
                 this.canvas.width = Math.round(r.width * dpr);
                 this.canvas.height = Math.round(r.height * dpr);
             }
-            this.scale = Math.min((this.width - 24) / 870, (this.height - 150) / 440);
-            this.origin = { x: this.width * 0.5, y: 118 + (this.height - 158 - 320 * this.scale) / 2 };
+            this.scale = Math.min((this.width - 32) / 700, (this.height - 132) / 411);
+            this.origin = { x: this.width * 0.5, y: 105 + (this.height - 146 - 252 * this.scale) / 2 };
         }
         p(x, y, z = 0) {
             return { x: ((x - y) * TILE) / 2, y: ((x + y) * TILE) / 4 - z };
@@ -88,16 +88,6 @@
             const p = this.p(x, y);
             return StoreSprites.draw(this.ctx, sheet, name, p.x, p.y, width, options);
         }
-        texturedTile(name, x, y, z, opacity) {
-            const p = this.p(x + 0.5, y + 0.5, z),
-                c = this.ctx;
-            c.save();
-            this.surface(x, y, 1, 1, z);
-            c.clip();
-            c.globalAlpha = opacity;
-            StoreSprites.draw(c, 'furniture', name, p.x, p.y, TILE + 3, { height: 35, anchor: 0.5 });
-            c.restore();
-        }
         plant(x, y, big = false) {
             if (this.sprite('furniture', big ? 'blossom' : 'shrub', x + 0.24, y + 0.24, big ? 65 : 31))
                 return;
@@ -119,21 +109,6 @@
             }
             this.ellipse(center.x - 6, center.y - 8, big ? 14 : 7, big ? 12 : 6, '#a6ba83');
         }
-        tree(x, y) {
-            if (this.sprite('furniture', 'tree', x, y, 93)) return;
-            const p = this.p(x, y);
-            this.ellipse(p.x + 7, p.y + 7, 40, 19, '#6477471c');
-            this.box(x - 0.08, y - 0.08, 0.16, 0.16, 0, 66, '#93876a', '#8a7e61', '#7e7459');
-            const a = this.p(x, y, 84);
-            for (const [dx, dy, r, col] of [
-                [-18, 0, 28, '#8eaa6d'],
-                [20, 0, 30, '#88a566'],
-                [0, -22, 33, '#a1b97c'],
-                [-10, 12, 29, '#91ae6f'],
-                [13, -14, 27, '#b0c58b'],
-            ])
-                this.ellipse(a.x + dx, a.y + dy, r, r * 0.84, col);
-        }
         building(b, preview = false) {
             const d = Store.CATALOG[b.type],
                 { w, h } = d.size,
@@ -144,7 +119,10 @@
                 H = h - 0.18;
             if (!preview) this.shadow(x, y, W, H);
             if (
-                this.sprite('furniture', b.type, b.x + w / 2, b.y + h / 2, w === 1 ? 52 : 94, { flip: w > 1 })
+                this.sprite('furniture', b.type, b.x + w / 2, b.y + h / 2, w === 1 ? 52 : 94, {
+                    flip: w > 1,
+                    floorSlope: this.p(1, 0).y / this.p(1, 0).x,
+                })
             )
                 return;
             if (b.type === 'produce') {
@@ -248,35 +226,52 @@
             this.text(text, 0, 4, 5.3, color);
             c.restore();
         }
-        counter() {
-            this.shadow(1.05, 7.05, 1.9, 0.85);
-            if (this.sprite('furniture', 'counter', 2, 7.5, 92, { flip: true })) return;
-            this.box(1.05, 7.05, 1.9, 0.85, 0, 28, '#bed0ad', '#547d62', '#41684f');
-            this.box(1.01, 7.01, 1.98, 0.93, 28, 4, '#d4bd90', '#b9a37a', '#a58d67');
-            this.box(1.17, 7.2, 0.7, 0.53, 32, 2, '#829184', '#647e6d', '#637766');
-            this.box(2.2, 7.28, 0.37, 0.34, 32, 6, '#dedfce', '#9da99b', '#89988c');
-            const p = this.p(2.35, 7.35, 47);
-            this.polygon(
-                [
-                    { x: p.x - 7, y: p.y - 6 },
-                    { x: p.x + 7, y: p.y + 1 },
-                    { x: p.x + 7, y: p.y + 12 },
-                    { x: p.x - 7, y: p.y + 5 },
-                ],
-                '#44635a',
-            );
-            this.polygon(
-                [
-                    { x: p.x - 5, y: p.y - 3 },
-                    { x: p.x + 5, y: p.y + 2 },
-                    { x: p.x + 5, y: p.y + 9 },
-                    { x: p.x - 5, y: p.y + 4 },
-                ],
-                '#a3c8b7',
-            );
-            const bag = this.p(1.9, 7.65, 33);
-            this.box(1.81, 7.55, 0.2, 0.22, 32, 11, '#d9c49a', '#c0a979', '#b29a70');
-            this.line({ x: bag.x - 3, y: bag.y - 10 }, { x: bag.x - 3, y: bag.y - 16 }, '#ab976c', 1);
+        counter(x, y) {
+            if (
+                this.sprite('furniture', 'counter', x + 1, y + 0.5, 92, {
+                    flip: true,
+                    floorSlope: this.p(1, 0).y / this.p(1, 0).x,
+                })
+            )
+                return;
+            this.box(x + 0.05, y + 0.05, 1.9, 0.85, 0, 29, '#f4dcc0', '#d3473e', '#9e292c');
+            this.box(x + 1.1, y + 0.3, 0.35, 0.35, 29, 14, '#7795a2', '#38424d', '#232b34');
+        }
+        wallFace(alongX) {
+            const point = (u, z) => (alongX ? this.p(u, 0, z) : this.p(0, u, z));
+            const c = this.ctx;
+            const gradient = c.createLinearGradient(0, -68, 0, 160);
+            gradient.addColorStop(0, alongX ? '#ffe7cf' : '#efd1b7');
+            gradient.addColorStop(1, alongX ? '#d49873' : '#bd8160');
+            this.polygon([point(0, 68), point(10, 68), point(10, 0), point(0, 0)], gradient);
+            for (let z = 12; z < 68; z += 11) {
+                this.line(point(0, z), point(10, z), '#fff4df35', 0.8);
+                for (let u = z % 2 ? 0.45 : 0.9; u < 10; u += 0.9)
+                    this.line(point(u, z - 11), point(u, z), '#98624426', 0.7);
+            }
+            this.line(point(0, 68), point(10, 68), '#fff3db', 4);
+            this.line(point(0, 3), point(10, 3), '#9d654b', 4);
+        }
+        frontGlass() {
+            const c = this.ctx;
+            for (const x of [0.5, 1.6, 2.7, 5.4, 6.5]) {
+                const y = 10;
+                const a = this.p(x, y, 44),
+                    b = this.p(x + 1.1, y, 44);
+                const d = this.p(x, y, 1),
+                    e = this.p(x + 1.1, y, 1);
+                const glass = c.createLinearGradient(a.x, a.y, e.x, e.y);
+                glass.addColorStop(0, '#c9f0ffdf');
+                glass.addColorStop(0.52, '#61abd6b3');
+                glass.addColorStop(1, '#346e9eb8');
+                this.polygon([a, b, e, d], glass);
+                this.line(a, b, '#e3edf2', 3);
+                this.line(d, e, '#4c6682', 4);
+                this.line(a, d, '#5e7d99', 3);
+                this.line(b, e, '#476784', 3);
+                this.line(this.p(x + 0.18, y, 34), this.p(x + 0.9, y, 28), '#ffffff9e', 2);
+                this.line(this.p(x + 0.81, y, 18), this.p(x + 0.81, y, 12), '#f0dfb7', 2);
+            }
         }
         person(a, time, staff = false, cashier = false) {
             const p = this.p(a.x + 0.5, a.y + 0.5),
@@ -328,25 +323,8 @@
             }
         }
         walls() {
-            this.box(-0.17, -0.17, 10.34, 0.16, 0, 66, '#d9d7bd', '#e0dfc8', '#c0c6aa');
-            this.box(-0.17, 0, 0.16, 10, 0, 66, '#d9d7bd', '#bcc6ac', '#e3e0c8');
-            this.box(-0.2, -0.2, 10.4, 0.2, 65, 4, '#eee8cd', '#d7d8bb', '#c9ceb1');
-            this.box(-0.2, 0, 0.2, 10, 65, 4, '#eee8cd', '#c1c9ac', '#dcd8ba');
-            this.box(0, 0.03, 10, 0.03, 0, 10, '#96aa83', '#a5b995', '#8da57d');
-            this.box(0.03, 0, 0.03, 10, 0, 10, '#96aa83', '#a5b995', '#8da57d');
-            // Windows on the rear wall, built in its projected plane.
-            for (const x of [1.1, 3.4, 6.6]) {
-                const points = [
-                    this.p(x, 0, 52),
-                    this.p(x + 1.6, 0, 52),
-                    this.p(x + 1.6, 0, 19),
-                    this.p(x, 0, 19),
-                ];
-                this.polygon(points, '#b7d0c4', '#92ad9b');
-                this.line(this.p(x + 0.8, 0, 52), this.p(x + 0.8, 0, 19), '#e5e4c8', 3);
-                this.line(this.p(x, 0, 35), this.p(x + 1.6, 0, 35), '#e5e4c8', 3);
-                this.line(this.p(x + 0.1, 0, 23), this.p(x + 1.45, 0, 49), '#d6e5d746', 5);
-            }
+            this.wallFace(true);
+            this.wallFace(false);
             const c = this.ctx,
                 p = this.p(0, 4.8, 43);
             c.save();
@@ -358,47 +336,10 @@
             this.text('FRAIS • LOCAL • DE SAISON', 0, 7, 4.8, '#d7e0bd');
             c.restore();
         }
-        environment(time) {
-            const c = this.ctx;
-            this.ellipse(7, 200, 360, 135, '#7c8e6220');
-            this.box(-1.7, -1.7, 13.4, 13.4, -22, 18, '#a7c65b', '#82a445', '#688c3c');
-            for (let i = -1; i <= 10; i++) {
-                this.texturedTile('grass', i, -1.65, -3.8, 0.95);
-                this.texturedTile('grass', i, 10.65, -3.8, 0.95);
-                this.texturedTile('grass', -1.65, i, -3.8, 0.95);
-                this.texturedTile('grass', 10.65, i, -3.8, 0.95);
-            }
-            // A paved lane around the store; individually shaded slabs keep the miniature scale.
-            for (let y = -1; y < 11; y++)
-                for (let x = -1; x < 11; x++)
-                    if (x < 0 || y < 0 || x === 10 || y === 10) {
-                        this.surface(x, y, 0.98, 0.98, -3, (x + y) % 2 ? '#dedbc8' : '#e4dfce', '#c7c7ae55');
-                        this.texturedTile('paving', x, y, -2.9, 1);
-                    }
-            this.tree(-1.1, 1.4);
-            this.tree(9.5, -1.1);
-            this.plant(-1.3, 6.6, true);
-            // Small entrance welcome mat.
-            this.surface(3.9, 10.05, 1.3, 0.85, 1, '#8c9d78');
-            const p = this.p(4.55, 10.5, 2);
-            c.save();
-            c.translate(p.x, p.y);
-            c.transform(1, 0.5, -1, 0.5, 0, 0);
-            this.text('BIENVENUE', 0, 2, 5, '#f2edcf');
-            c.restore();
-            // Sparse meadow flowers, stable positions rather than per-frame randomness.
-            for (let i = 0; i < 30; i++) {
-                const x = -1.5 + ((i * 1.79) % 13),
-                    y = i % 2 ? -1.4 : 11.35;
-                const p = this.p(x, y, -2);
-                this.line(p, { x: p.x + 1, y: p.y - 4 }, '#9cad7b', 1);
-                if (i % 3 === 0) this.ellipse(p.x + 1, p.y - 5, 1.8, 1.8, '#f3edc0');
-            }
-        }
         render(state, hover, selected) {
             this.resize();
             const c = this.ctx;
-            c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            c.setTransform(this.canvas.width / this.width, 0, 0, this.canvas.height / this.height, 0, 0);
             c.clearRect(0, 0, this.width, this.height);
             const gradient = c.createRadialGradient(
                 this.width * 0.5,
@@ -408,30 +349,32 @@
                 this.height * 0.5,
                 this.width * 0.65,
             );
-            gradient.addColorStop(0, '#f3faff');
-            gradient.addColorStop(1, '#d8ebf8');
+            gradient.addColorStop(0, '#53768d');
+            gradient.addColorStop(1, '#1e3148');
             c.fillStyle = gradient;
             c.fillRect(0, 0, this.width, this.height);
             c.save();
             c.translate(this.origin.x, this.origin.y);
             c.scale(this.scale, this.scale);
-            this.environment(state.time);
-            this.box(0, 0, 10, 10, -12, 12, '#efead8', '#c5bda3', '#b1af94');
+            this.ellipse(6, 191, 302, 140, '#0a142b43');
+            this.box(0, 0, 10, 10, -15, 15, '#f9dfc4', '#c99772', '#ac7a57');
             for (let y = 0; y < 10; y++)
                 for (let x = 0; x < 10; x++) {
-                    this.surface(x, y, 0.997, 0.997, 0.1, (x + y) % 2 ? '#e8e1cb' : '#f0ead7', '#d4cdb544');
-                    this.texturedTile('paving', x, y, 0.15, 0.4);
+                    this.surface(x, y, 1, 1, 0.1, (x + y) % 2 ? '#f1d1ad' : '#f8dfc3', '#bc91695e');
                 }
             this.walls();
+            this.surface(4.04, 9.55, 0.92, 0.46, 0.2, '#855145', '#b47e60');
             const renderables = state.buildings.map((b) => ({
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
                 draw: () => this.building(b),
             }));
-            renderables.push({ depth: 9.5, draw: () => this.counter() });
-            renderables.push({
-                depth: 8,
-                draw: () => this.person({ x: 1.25, y: 6, color: 0 }, state.time, true, true),
-            });
+            for (const { x, y } of Store.COUNTERS) {
+                renderables.push({ depth: x + y + 1.5, draw: () => this.counter(x, y) });
+                renderables.push({
+                    depth: x + y + 0.25,
+                    draw: () => this.person({ x: x + 0.25, y: y - 1, color: 0 }, state.time, true, true),
+                });
+            }
             for (const a of state.customers)
                 renderables.push({ depth: a.x + a.y + 1, draw: () => this.person(a, state.time) });
             renderables.push({
@@ -440,30 +383,9 @@
             });
             for (const [x, y] of [
                 [0.3, 0.8],
-                [0.3, 8.7],
                 [8.8, 0.4],
             ])
                 renderables.push({ depth: x + y + 1, draw: () => this.plant(x, y) });
-            for (const [x, y, big] of [
-                [10.45, 2, true],
-                [1.7, 10.5, false],
-                [7.4, 10.5, false],
-            ])
-                renderables.push({ depth: x + y + 1, draw: () => this.plant(x, y, big) });
-            renderables.push({
-                depth: 16.4,
-                draw: () =>
-                    this.sprite('furniture', 'hedge', 10.55, 5.65, 72) ||
-                    this.box(10.45, 5, 0.35, 1.65, -2, 13, '#94ad73', '#7d9860', '#718c56'),
-            });
-            renderables.push({
-                depth: 18.5,
-                draw: () => {
-                    if (this.sprite('furniture', 'bench', 10.5, 7.9, 60)) return;
-                    this.box(10.28, 7.3, 0.54, 1.3, 0, 12, '#c6ac7a', '#af9567', '#a08760');
-                    this.box(10.72, 7.3, 0.12, 1.3, 12, 16, '#c6ac7a', '#b29a6c', '#9b855c');
-                },
-            });
             // Stock crates in the rear corner.
             renderables.push({
                 depth: 9.8,
@@ -473,7 +395,14 @@
                     this.box(9, 0.35, 0.62, 0.52, 18, 15, '#d8c397', '#bfa775', '#ae9667');
                 },
             });
-            renderables.push({ depth: 15.5, draw: () => this.sprite('furniture', 'lamp', 5.1, 10.5, 25) });
+            renderables.push({ depth: 21, draw: () => this.frontGlass() });
+            renderables.push({
+                depth: 22,
+                draw: () => {
+                    this.plant(0.12, 10, false);
+                    this.plant(7.54, 10, false);
+                },
+            });
             if (selected && hover && hover.x >= 0 && hover.y >= 0 && hover.x < 10 && hover.y < 10) {
                 const valid = Store.placement(state, selected, hover.x, hover.y).ok,
                     d = Store.CATALOG[selected];

@@ -1,12 +1,15 @@
 (function (root) {
     'use strict';
     const TILE = 64;
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     class StoreRenderer {
         constructor(canvas) {
             this.canvas = canvas;
             this.ctx = canvas.getContext('2d');
             this.width = 0;
             this.height = 0;
+            this.zoom = 1;
+            this.pan = { x: 0, y: 0 };
             this.scale = 1;
             this.origin = { x: 0, y: 0 };
         }
@@ -19,9 +22,31 @@
                 this.dpr = dpr;
                 this.canvas.width = Math.round(r.width * dpr);
                 this.canvas.height = Math.round(r.height * dpr);
+                this.fitScale = Math.max(0.01, Math.min((this.width - 32) / 700, (this.height - 132) / 411));
+                this.updateCamera();
             }
-            this.scale = Math.min((this.width - 32) / 700, (this.height - 132) / 411);
-            this.origin = { x: this.width * 0.5, y: 105 + (this.height - 146 - 252 * this.scale) / 2 };
+        }
+        updateCamera() {
+            this.scale = this.fitScale * this.zoom;
+            const baseX = this.width * 0.5,
+                baseY = 105 + (this.height - 146 - 252 * this.fitScale) / 2,
+                marginX = this.width * 0.2,
+                marginY = this.height * 0.2,
+                floorExtent = 5 * TILE * this.scale;
+            // Keep part of the floor reachable even after a long drag.
+            this.pan.x = clamp(this.pan.x, marginX - baseX - floorExtent, this.width - marginX - baseX + floorExtent);
+            this.pan.y = clamp(this.pan.y, marginY - baseY - floorExtent, this.height - marginY - baseY);
+            this.origin = { x: baseX + this.pan.x, y: baseY + this.pan.y };
+        }
+        moveCamera(from, to, factor = 1) {
+            this.resize();
+            const rect = this.canvas.getBoundingClientRect(),
+                zoom = clamp(this.zoom * factor, 1, 3),
+                ratio = zoom / this.zoom;
+            this.pan.x += to.x - from.x + (1 - ratio) * (from.x - rect.left - this.origin.x);
+            this.pan.y += to.y - from.y + (1 - ratio) * (from.y - rect.top - this.origin.y);
+            this.zoom = zoom;
+            this.updateCamera();
         }
         p(x, y, z = 0) {
             return { x: ((x - y) * TILE) / 2, y: ((x + y) * TILE) / 4 - z };
@@ -457,6 +482,7 @@
             c.restore();
         }
         pick(clientX, clientY) {
+            this.resize();
             const rect = this.canvas.getBoundingClientRect();
             return Isometric.pick(
                 (clientX - rect.left - this.origin.x) / this.scale,

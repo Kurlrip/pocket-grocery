@@ -15,6 +15,7 @@ python -m http.server 8080
 - Ouvrir **Construire**, choisir un rayon, puis toucher ou cliquer sur une case libre. Un premier stock est inclus dans le prix. **Annuler** quitte le placement.
 - Sur téléphone, glisser avec un doigt déplace la vue et pincer avec deux doigts zoome. Le catalogue et les objectifs s’ouvrent depuis le dock.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
+- Chaque client cherche un type de produit. Le catalogue indique le stock, les ventes et les demandes manquées par rayon depuis le début de la partie. Une suggestion apparaît quand un produit demandé reste indisponible.
 - L'employé réapprovisionne les rayons sous la moitié de leur capacité. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.
 - **Commandes** donne accès à la pause, aux vitesses 1×, 2× et 4× et à l’aide. Sur PC, Espace met le jeu en pause hors boutons. Échap ferme le panneau ouvert ou quitte le placement.

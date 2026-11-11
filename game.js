@@ -20,6 +20,15 @@
     const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier', controls: 'Commandes' };
     const panelButtons = [...document.querySelectorAll('[data-panel]')];
     const catalogFeedback = $('catalogFeedback');
+    const demandHint = $('demandHint');
+    const catalogCards = new Map();
+    let hintedProduct = null;
+    function setText(element, text) {
+        if (element.textContent !== text) element.textContent = text;
+    }
+    function missedLabel(count) {
+        return count === 1 ? '1 demande manquée' : `${count} demandes manquées`;
+    }
     for (const element of document.querySelectorAll('[data-art]')) {
         const image = new Image();
         image.alt = element.dataset.art === 'logo' ? 'Commerce Town' : '';
@@ -38,6 +47,11 @@
             button.setAttribute('aria-expanded', 'true');
             panel.showModal();
             panelBody.scrollTop = 0;
+            if (button === demandHint && hintedProduct) {
+                const card = catalogCards.get(hintedProduct).button;
+                card.focus({ preventScroll: true });
+                card.scrollIntoView({ block: 'nearest' });
+            }
         });
     }
     $('closePanel').addEventListener('click', () => panel.close());
@@ -55,7 +69,7 @@
         button.className = 'catalog-card';
         button.dataset.type = type;
         button.setAttribute('aria-pressed', 'false');
-        button.innerHTML = `<canvas aria-hidden="true"></canvas><strong>${d.name}</strong><span class="card-detail">${d.detail}</span><span class="card-price"><span>${d.cost} €</span><small>+${d.price} € / vente</small></span>`;
+        button.innerHTML = `<canvas aria-hidden="true"></canvas><strong>${d.name}</strong><span class="card-detail">${d.detail}</span><span class="card-demand"><span class="card-stock"></span><span class="card-sales"></span><span class="card-missed"></span></span><span class="card-price"><span>${d.cost} €</span><small>+${d.price} € / vente</small></span>`;
         button.addEventListener('click', () => {
             if (state.money < d.cost) {
                 catalogFeedback.textContent = `Il manque ${moneyFormat.format(d.cost - state.money)} € pour ce rayon.`;
@@ -70,6 +84,12 @@
             updateUI();
         });
         $('catalog').appendChild(button);
+        catalogCards.set(type, {
+            button,
+            stock: button.querySelector('.card-stock'),
+            sales: button.querySelector('.card-sales'),
+            missed: button.querySelector('.card-missed'),
+        });
         StoreRenderer.thumbnail(button.querySelector('canvas'), type);
     }
     StoreSprites.ready.then(() => {
@@ -79,7 +99,35 @@
                 StoreRenderer.thumbnail(button.querySelector('canvas'), button.dataset.type),
             );
         if (selected) StoreRenderer.thumbnail($('placementArt'), selected);
+        if (hintedProduct) StoreRenderer.thumbnail($('demandArt'), hintedProduct);
     });
+    function updateCatalog() {
+        let recommendation = null;
+        for (const [type, { button, stock, sales, missed }] of catalogCards) {
+            const shelves = state.buildings.filter((shelf) => shelf.type === type);
+            const units = shelves.reduce((total, shelf) => total + shelf.stock, 0);
+            const demand = state.demand[type];
+            setText(stock, units ? `${units} en stock` : shelves.length ? 'En rupture' : 'Rayon à ouvrir');
+            setText(sales, `${demand.sold} vente${demand.sold === 1 ? '' : 's'}`);
+            setText(missed, missedLabel(demand.missed));
+            missed.classList.toggle('has-misses', demand.missed > 0);
+            missed.hidden = !demand.missed;
+            button.classList.toggle('needs-stock', !units && demand.missed > 0);
+            button.classList.toggle('selected', type === selected);
+            button.classList.toggle('unaffordable', state.money < Store.CATALOG[type].cost);
+            button.setAttribute('aria-pressed', String(type === selected));
+            if (!units && demand.missed > (recommendation ? state.demand[recommendation].missed : 0))
+                recommendation = type;
+        }
+        if (recommendation !== hintedProduct && recommendation)
+            StoreRenderer.thumbnail($('demandArt'), recommendation);
+        hintedProduct = recommendation;
+        demandHint.hidden = !hintedProduct || !!selected;
+        if (hintedProduct) {
+            setText($('demandProduct'), Store.CATALOG[hintedProduct].detail);
+            setText($('demandCount'), missedLabel(state.demand[hintedProduct].missed));
+        }
+    }
     function updateUI() {
         $('money').textContent = `${moneyFormat.format(state.money)} €`;
         $('served').textContent = state.served;
@@ -92,11 +140,7 @@
                 done = state.completed[i];
             return `<div class="goal"><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track" aria-hidden="true"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? '✓ Prime reçue' : `+${g.reward} €`}</b></div></div>`;
         }).join('');
-        document.querySelectorAll('.catalog-card').forEach((b) => {
-            b.classList.toggle('selected', b.dataset.type === selected);
-            b.classList.toggle('unaffordable', state.money < Store.CATALOG[b.dataset.type].cost);
-            b.setAttribute('aria-pressed', String(b.dataset.type === selected));
-        });
+        updateCatalog();
         $('placement').hidden = !selected;
         if (selected) {
             const item = Store.CATALOG[selected];

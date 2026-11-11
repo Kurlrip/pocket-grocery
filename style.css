@@ -153,7 +153,7 @@ h1, h2, h3, p { margin: 0; }
 .goals { --light: #ffc653; --dark: #b65b12; --edge: #74370c; }
 .settings { --light: #56a8e2; --dark: #2062ab; --edge: #123962; }
 .dock-button:active, .dock-button[aria-expanded="true"], .mission:active { transform: translateY(2px); }
-.placement, .toast {
+.placement, .toast, .demand-hint {
     position: absolute;
     left: 50%;
     translate: -50% 0;
@@ -173,6 +173,21 @@ h1, h2, h3, p { margin: 0; }
 }
 .placement canvas { width: 51px; height: 36px; object-fit: contain; }
 .placement small { display: block; color: #6f4828; font-weight: 700; }
+.demand-hint {
+    bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 4px 10px 4px 5px;
+    border-color: #f9dca4;
+    background: linear-gradient(#fff5db, #ffdc9e);
+    text-align: left;
+}
+.demand-hint canvas { flex: none; width: 52px; height: 37px; object-fit: contain; }
+.demand-hint strong, .demand-hint small { display: block; }
+.demand-hint small { color: #784629; font-weight: 700; }
+.demand-arrow { margin-inline-start: 4px; font-size: 26px; font-weight: 900; color: #75491f; }
 .toast {
     z-index: 1;
     bottom: 78px;
@@ -255,8 +270,21 @@ h1, h2, h3, p { margin: 0; }
 .catalog-card canvas { width: 100%; height: 68px; object-fit: contain; pointer-events: none; }
 .catalog-card strong { font-size: 15px; }
 .card-detail { color: #554c43; font-size: 13px; }
+.card-demand {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 5px;
+    margin-top: 7px;
+    padding-top: 5px;
+    border-top: 1px solid #d9bc90;
+    color: #544738;
+    font-size: 12px;
+}
+.card-missed { grid-column: 1 / -1; }
+.card-missed.has-misses { color: #813e2d; font-weight: 800; }
 .catalog-card.selected { border-color: #6a348d; background: #f4ddff; }
 .catalog-card.unaffordable { background: #f0e4d2; }
+.catalog-card.needs-stock:not(.selected) { border-color: #b96b34; box-shadow: 0 2px #b96b34; }
 .card-price {
     display: flex;
     align-items: baseline;
@@ -304,7 +332,7 @@ details p { margin-bottom: 9px; }
 @media (max-width: 340px) {
     .catalog { grid-template-columns: minmax(0, 1fr); }
     .catalog-card { display: grid; grid-template-columns: 66px 1fr; column-gap: 7px; }
-    .catalog-card canvas { grid-row: span 3; height: 53px; align-self: center; }
+    .catalog-card canvas { grid-row: span 4; height: 53px; align-self: center; }
     .dock-button { font-size: 13px; }
 }
 @media (orientation: landscape) and (max-height: 500px) {

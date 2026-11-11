@@ -470,8 +470,19 @@
                     draw: () => StoreSprites.draw(c, 'street', name, p.x, p.y, width),
                 });
             }
-            for (const a of state.customers)
-                renderables.push({ depth: a.x + a.y + 1, draw: () => this.person(a, state.time) });
+            for (const a of state.customers) {
+                renderables.push({
+                    depth: a.x + a.y + 1,
+                    draw: () => {
+                        this.person(a, state.time);
+                        if (a.unserved) {
+                            const p = this.p(a.x + 0.5, a.y + 0.5, 48);
+                            this.ellipse(p.x, p.y, 9, 8, '#fff0cc');
+                            this.text('!', p.x, p.y + 4, 12, '#813e2d');
+                        }
+                    },
+                });
+            }
             renderables.push({
                 depth: state.staff.x + state.staff.y + 1,
                 draw: () => this.person(state.staff, state.time, true),

@@ -61,6 +61,7 @@
             size: { w: 1, h: 1 },
         },
     };
+    const productTypes = Object.keys(CATALOG);
     const GOALS = [
         {
             title: 'Les premiers habitués',
@@ -148,6 +149,7 @@
             served: 0,
             revenue: 0,
             supplySpent: 0,
+            demand: Object.fromEntries(productTypes.map((type) => [type, { sold: 0, missed: 0 }])),
             time: 0,
             spawnTimer: 1,
             nextId: 6,
@@ -259,6 +261,23 @@
             }
         });
     }
+    function findStockedShelf(buildings, grid, from, type) {
+        let best = null;
+        for (const b of buildings) {
+            if (b.type !== type || b.stock <= 0) continue;
+            const route = nearestRoute(grid, from, serviceCells(b, grid));
+            if (route && (!best || route.length < best.route.length)) best = { id: b.id, route };
+        }
+        return best;
+    }
+    function leaveShop(s, grid, a, from, missed = false) {
+        if (missed) s.demand[a.request].missed++;
+        a.unserved = missed;
+        a.value = 0;
+        a.state = 'leaving';
+        a.timer = missed ? 0.8 : 0;
+        a.route = path(grid, from, ENTRANCE) || [];
+    }
     function step(s, dt) {
         if (!Number.isFinite(dt) || dt <= 0) return;
         s.time += dt;
@@ -266,21 +285,21 @@
         const grid = gridFor(s.buildings);
         if (s.spawnTimer <= 0) {
             s.spawnTimer = 3.5;
-            const stocked = s.buildings.filter((b) => b.stock > 0);
-            if (s.customers.length < 9 && stocked.length) {
-                const b = stocked[Math.floor(random(s) * stocked.length)];
-                const route = nearestRoute(grid, ENTRANCE, serviceCells(b, grid));
-                if (route)
-                    s.customers.push({
-                        x: ENTRANCE.x,
-                        y: ENTRANCE.y,
-                        route,
-                        state: 'shopping',
-                        target: b.id,
-                        timer: 0.9,
-                        value: 0,
-                        color: Math.floor(random(s) * 5),
-                    });
+            if (s.customers.length < 9) {
+                const request = productTypes[Math.floor(random(s) * productTypes.length)];
+                const shelf = findStockedShelf(s.buildings, grid, ENTRANCE, request);
+                const customer = {
+                    ...ENTRANCE,
+                    request,
+                    route: shelf?.route ?? [],
+                    state: 'shopping',
+                    target: shelf?.id ?? null,
+                    timer: 0.9,
+                    value: 0,
+                    color: Math.floor(random(s) * 5),
+                };
+                if (!shelf) leaveShop(s, grid, customer, ENTRANCE, true);
+                s.customers.push(customer);
             }
         }
         for (const a of s.customers) {
@@ -290,23 +309,26 @@
             const from = { x: a.x, y: a.y };
             if (a.state === 'shopping') {
                 const b = s.buildings.find((b) => b.id === a.target);
-                if (b?.stock > 0) {
-                    b.stock--;
-                    a.value = CATALOG[b.type].price;
+                if (!b || b.stock <= 0) {
+                    const alternative = findStockedShelf(s.buildings, grid, from, a.request);
+                    if (alternative) {
+                        a.target = alternative.id;
+                        a.route = alternative.route;
+                        a.timer = 0.9;
+                    } else leaveShop(s, grid, a, from, true);
+                    continue;
                 }
+                b.stock--;
+                a.value = CATALOG[a.request].price;
                 a.state = 'checkout';
                 a.timer = 1.1;
                 a.route = nearestRoute(grid, from, CHECKOUTS) || [];
             } else if (a.state === 'checkout') {
-                if (a.value > 0) {
-                    s.money += a.value;
-                    s.revenue += a.value;
-                    s.served++;
-                }
-                a.value = 0;
-                a.state = 'leaving';
-                a.timer = 0;
-                a.route = path(grid, from, ENTRANCE) || [];
+                s.money += a.value;
+                s.revenue += a.value;
+                s.served++;
+                s.demand[a.request].sold++;
+                leaveShop(s, grid, a, from);
             } else a.state = 'done';
         }
         s.customers = s.customers.filter((a) => a.state !== 'done');

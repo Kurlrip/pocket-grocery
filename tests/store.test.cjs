@@ -59,7 +59,51 @@ test('customers buy, pay, leave, and staff pay for replacement stock', () => {
     const rewards = S.GOALS.reduce((n, g, i) => n + (s.completed[i] ? g.reward : 0), 0);
     assert.equal(s.money, 480 + s.revenue - s.supplySpent + rewards);
     assert.ok(s.customers.length <= 9);
+    assert.equal(Object.values(s.demand).reduce((total, demand) => total + demand.sold, 0), s.served);
+    assert.equal(Object.entries(s.demand).reduce((total, [type, demand]) => total + demand.sold * S.CATALOG[type].price, 0), s.revenue);
     for (const b of s.buildings) assert.ok(b.stock >= 0 && b.stock <= S.CATALOG[b.type].capacity);
+});
+
+test('an absent product misses sales until its shelf is opened', () => {
+    const s = S.create();
+    run(s, 10);
+    const missed = s.demand.flowers.missed;
+    assert.ok(missed > 0);
+    assert.equal(s.demand.flowers.sold, 0);
+    assert.equal(S.place(s, 'flowers', 5, 7).ok, true);
+    run(s, 35);
+    assert.equal(s.demand.flowers.missed, missed);
+    assert.ok(s.demand.flowers.sold > 0);
+});
+
+test('a customer finds a second shelf of the same type if the first sells out', () => {
+    const s = S.create();
+    assert.equal(S.place(s, 'produce', 5, 6).ok, true);
+    run(s, 2);
+    const customer = s.customers.find((a) => a.request === 'produce');
+    const target = s.buildings.find((b) => b.id === customer.target);
+    const alternative = s.buildings.find((b) => b.type === 'produce' && b !== target);
+    s.spawnTimer = Infinity;
+    s.money = 0;
+    target.stock = 0;
+    run(s, 18);
+    assert.equal(s.demand.produce.missed, 0);
+    assert.equal(s.demand.produce.sold, 1);
+    assert.equal(alternative.stock, S.CATALOG.produce.capacity - 1);
+});
+
+test('a shelf running out during the trip records one miss and no sale', () => {
+    const s = S.create();
+    run(s, 2);
+    const customer = s.customers.find((a) => a.request === 'produce');
+    s.buildings.find((b) => b.id === customer.target).stock = 0;
+    s.spawnTimer = Infinity;
+    s.money = 0;
+    run(s, 20);
+    assert.deepEqual(s.demand.produce, { sold: 0, missed: 1 });
+    assert.equal(s.served, 0);
+    assert.equal(s.money, 0);
+    assert.equal(s.customers.length, 0);
 });
 
 test('agents never occupy furniture or move diagonally through it', () => {

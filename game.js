@@ -118,7 +118,7 @@
         $('restartButton').focus();
     });
     $('restartYes').addEventListener('click', () => {
-        if (!save.write(Store.create({ empty: true }), 1, false, true)) {
+        if (!save.write(Store.create(), 1, false, true)) {
             setText($('saveStatus'), saveMessages[save.status]);
             return;
         }
@@ -201,7 +201,8 @@
         if (recommendation !== hintedProduct && recommendation)
             StoreRenderer.thumbnail($('demandArt'), recommendation);
         hintedProduct = recommendation;
-        demandHint.hidden = !hintedProduct || !!selected || !!editing || expanding;
+        demandHint.hidden = !hintedProduct || !!selected || !!editing || expanding ||
+            !state.buildings.length || !state.counters.some((b) => b.staffed);
         if (hintedProduct) {
             setText($('demandProduct'), Store.CATALOG[hintedProduct].detail);
             setText($('demandCount'), missedLabel(state.demand[hintedProduct].missed));
@@ -229,10 +230,10 @@
     function updateTeam() {
         const team = Store.TEAM;
         const active = state.counters.filter((b) => b.staffed).length;
-        $('teamSummary').textContent = `${active} / ${state.counters.length} caisses ouvertes · ${1 + state.helpers.length} en réserve`;
+        $('teamSummary').textContent = `${active} / ${state.counters.length} caisses ouvertes · ${Store.workers(state).length} en réserve`;
         $('teamWages').textContent = `Salaires supplémentaires ${Store.dailyWages(state)} € / jour` +
             (state.payrollDue ? ` · ${state.payrollDue} € à régler` : '');
-        $('helperDetails').textContent = `Un renfort aide au réassort pour ${team.helperWage} € / jour.`;
+        $('helperDetails').textContent = `Un employé réapprovisionne les rayons pour ${team.helperWage} € / jour.`;
         $('hireHelperButton').textContent = state.helpers.length >= team.maxHelpers ?
             'Équipe complète' : `Embaucher un renfort · ${team.helper} €`;
         $('hireHelperButton').disabled = state.money < team.helper || state.helpers.length >= team.maxHelpers;
@@ -252,6 +253,11 @@
         }).join('');
         updateCatalog();
         updateTeam();
+        const opening = !state.counters.length ? 'Construire → Acheter une caisse' :
+            !state.counters.some((b) => b.staffed) ? 'Sélectionne ta caisse pour embaucher une caissière' :
+                !state.buildings.length ? 'Construire → Choisir un premier rayon' : '';
+        setText($('openingHint'), opening);
+        $('openingHint').hidden = !opening || !!selected || !!editing || expanding;
         const cashier = counterSelected(editing);
         $('counterButton').textContent = state.counters.length >= Store.TEAM.maxCounters ?
             'Nombre maximal de caisses atteint' : `Acheter une caisse · ${Store.TEAM.counter} €`;
@@ -291,7 +297,7 @@
             $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} / ${capacity} en stock`;
         }
         canvas.classList.toggle('placing', !!selected);
-        $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';
+        $('openText').textContent = paused ? 'Une petite pause' : opening ? 'En préparation' : 'C’est ouvert !';
         const pauseButton = $('pauseButton');
         pauseButton.textContent = paused ? '▶' : 'Ⅱ';
         pauseButton.title = paused ? 'Reprendre' : 'Pause';

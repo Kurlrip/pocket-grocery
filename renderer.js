@@ -818,7 +818,7 @@
                     draw: () => this.person(visibleStaff, state.time, true),
                 });
             });
-            renderables.push({
+            if (Store.workers(state).length) renderables.push({
                 depth: 8.5,
                 draw: () => {
                     const x = Store.DEPOT.x + 1.48, y = -1.46;

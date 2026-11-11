@@ -2,7 +2,7 @@
     'use strict';
     const Store = typeof module !== 'undefined' && module.exports ? require('./game-core.js') : root.Store;
     const KEY = 'commerce-town.save';
-    const VERSION = 3;
+    const VERSION = 4;
     const nonnegative = (value) => Number.isFinite(value) && value >= 0;
     const whole = (value) => Number.isSafeInteger(value) && value >= 0;
     const knownProduct = (type) => typeof type === 'string' && Object.hasOwn(Store.CATALOG, type);
@@ -59,13 +59,13 @@
             }
         }
 
-        if (!Array.isArray(s.counters) || s.counters.length < Store.COUNTERS.length ||
-            s.counters.length > Store.TEAM.maxCounters || !Array.isArray(s.helpers) ||
+        if (!Array.isArray(s.counters) || s.counters.length > Store.TEAM.maxCounters ||
+            (s.staff !== null && (!s.staff || typeof s.staff !== 'object')) || !Array.isArray(s.helpers) ||
             s.helpers.length > Store.TEAM.maxHelpers) return false;
         const checkouts = new Set();
         for (const [i, counter] of s.counters.entries()) {
             if (!counter || counter.id !== i + 1 || typeof counter.staffed !== 'boolean' ||
-                (i < Store.COUNTERS.length && !counter.staffed)) return false;
+                typeof counter.included !== 'boolean' || (counter.included && !counter.staffed)) return false;
             for (const p of Store.counterTiles(counter)) {
                 const key = p.y * Store.WIDTH + p.x;
                 if (!Store.hasFloor(p.x, p.y, s.expanded) || cells.has(key)) return false;
@@ -122,6 +122,11 @@
                     });
                     a.checkoutId = counter?.id ?? s.counters[0].id;
                 }
+                data.version = 3;
+            }
+            if (data?.version === 3 && data.state) {
+                for (const counter of data.state.counters)
+                    counter.included = counter.id <= Store.COUNTERS.length;
                 data.version = VERSION;
             }
             if (data?.version !== VERSION || ![1, 2, 3].includes(data.speed) ||

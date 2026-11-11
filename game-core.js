@@ -15,9 +15,9 @@
     const TEAM = { counter: 190, cashier: 95, helper: 140, cashierWage: 24, helperWage: 32, maxCounters: 6, maxHelpers: 2 };
     const checkoutCell = ({ x, y }) => ({ x: x + 2, y });
     const counterTiles = ({ x, y }) => [{ x, y }, { x: x + 1, y }, { x, y: y - 1 }];
-    const workers = (s) => [s.staff, ...s.helpers];
+    const workers = (s) => s.staff ? [s.staff, ...s.helpers] : s.helpers;
     const newWorker = () => ({ ...DEPOT, route: [], state: 'idle', target: null, timer: 0 });
-    const startingCounters = () => COUNTERS.map((b, i) => ({ ...b, id: i + 1, staffed: true }));
+    const startingCounters = () => COUNTERS.map((b, i) => ({ ...b, id: i + 1, staffed: true, included: true }));
     const CATALOG = {
         produce: {
             name: 'Le primeur',
@@ -168,7 +168,7 @@
         }
         return best;
     }
-    function create({ empty = false } = {}) {
+    function create({ empty = true } = {}) {
         const state = {
             money: 480,
             served: 0,
@@ -192,8 +192,8 @@
                 { id: 5, type: 'grocery', x: 7, y: 2, stock: CATALOG.grocery.capacity },
             ],
             customers: [],
-            counters: startingCounters(),
-            staff: newWorker(),
+            counters: empty ? [] : startingCounters(),
+            staff: empty ? null : newWorker(),
             helpers: [],
             events: [],
             rng: 82317,
@@ -352,7 +352,8 @@
         if (id && !current) return { ok: false, reason: 'Cette caisse est introuvable.' };
         if (!current && (s.counters.length >= TEAM.maxCounters || s.money < TEAM.counter))
             return { ok: false, reason: 'Vous ne pouvez pas acheter une caisse supplémentaire.' };
-        const candidate = { id: id ?? s.counters.length + 1, x, y, staffed: current?.staffed ?? false };
+        const candidate = { id: id ?? s.counters.length + 1, x, y, staffed: current?.staffed ?? false,
+            included: current?.included ?? false };
         const others = s.counters.filter((b) => b !== current);
         const grid = gridFor(s.buildings, s.expanded, others);
         const agents = [...s.customers, ...workers(s)];
@@ -416,7 +417,7 @@
         return true;
     }
     function dailyWages(s) {
-        return s.counters.filter((b) => b.id > COUNTERS.length && b.staffed).length * TEAM.cashierWage +
+        return s.counters.filter((b) => !b.included && b.staffed).length * TEAM.cashierWage +
             s.helpers.length * TEAM.helperWage;
     }
     function expand(s) {
@@ -500,7 +501,7 @@
         if (!Number.isFinite(dt) || dt <= 0) return;
         const day = dayOf(s);
         s.time += dt;
-        s.spawnTimer -= dt;
+        if (s.buildings.length && s.counters.some((b) => b.staffed)) s.spawnTimer -= dt;
         const grid = gridFor(s.buildings, s.expanded, s.counters);
         if (s.spawnTimer <= 0) {
             s.spawnTimer = 3.5;

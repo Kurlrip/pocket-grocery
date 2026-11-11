@@ -5,8 +5,24 @@ function run(s, seconds, onStockChange) {
     for (let i = 0; i < seconds * 30; i++) S.step(s, 1 / 30, onStockChange);
 }
 
+test('a new shop opens from an empty room within the starting budget', () => {
+    const s = S.create();
+    assert.deepEqual(s.buildings, []);
+    assert.deepEqual(s.counters, []);
+    assert.deepEqual(S.workers(s), []);
+    run(s, 10);
+    assert.equal(s.customers.length, 0);
+    assert.ok(S.placeCounter(s, 1, 7).ok);
+    assert.ok(S.hireCashier(s, 1));
+    assert.ok(S.place(s, 'produce', 3, 3).ok);
+    assert.equal(s.money, 75);
+    assert.equal(S.dailyWages(s), S.TEAM.cashierWage);
+    run(s, 45);
+    assert.ok(s.served > 0);
+});
+
 test('routes use cardinal, walkable cells and avoid the initial furniture', () => {
-    const s = S.create(),
+    const s = S.create({ empty: false }),
         grid = S.gridFor(s.buildings),
         route = S.path(grid, S.ENTRANCE, S.DEPOT);
     assert.ok(route.length);
@@ -21,7 +37,7 @@ test('routes use cardinal, walkable cells and avoid the initial furniture', () =
 });
 
 test('building charges exactly once, and rejection does not mutate the state', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     assert.equal(S.place(s, 'flowers', 5, 7).ok, true);
     assert.equal(s.money, 480 - S.CATALOG.flowers.cost + 180);
     assert.equal(s.buildings.at(-1).stock, S.CATALOG.flowers.capacity);
@@ -31,7 +47,7 @@ test('building charges exactly once, and rejection does not mutate the state', (
 });
 
 test('placement preserves service points, bounds and affordability', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     for (const p of [S.ENTRANCE, S.CHECKOUT, S.DEPOT, { x: 1, y: 7 }, { x: 9, y: 4 }, { x: -1, y: 1 }])
         assert.equal(S.placement(s, 'produce', p.x, p.y).ok, false);
     s.money = 0;
@@ -39,7 +55,7 @@ test('placement preserves service points, bounds and affordability', () => {
 });
 
 test('closing the last route from the entrance is rejected', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 10000;
     s.buildings = [];
     for (let x = 0; x < 10; x++)
@@ -50,7 +66,7 @@ test('closing the last route from the entrance is rejected', () => {
 });
 
 test('customers buy, pay, leave, and staff pay for replacement stock', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 180);
     assert.ok(s.served >= 30);
     assert.ok(s.revenue > 0);
@@ -65,7 +81,7 @@ test('customers buy, pay, leave, and staff pay for replacement stock', () => {
 });
 
 test('an absent product misses sales until its shelf is opened', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 10);
     const missed = s.demand.flowers.missed;
     assert.ok(missed > 0);
@@ -77,7 +93,7 @@ test('an absent product misses sales until its shelf is opened', () => {
 });
 
 test('a customer finds a second shelf of the same type if the first sells out', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     assert.equal(S.place(s, 'produce', 5, 6).ok, true);
     run(s, 2);
     const customer = s.customers.find((a) => a.request === 'produce');
@@ -93,7 +109,7 @@ test('a customer finds a second shelf of the same type if the first sells out', 
 });
 
 test('a shelf running out during the trip records one miss and no sale', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 2);
     const customer = s.customers.find((a) => a.request === 'produce');
     s.buildings.find((b) => b.id === customer.target).stock = 0;
@@ -107,7 +123,7 @@ test('a shelf running out during the trip records one miss and no sale', () => {
 });
 
 test('agents never occupy furniture or move diagonally through it', () => {
-    const s = S.create(),
+    const s = S.create({ empty: false }),
         grid = S.gridFor(s.buildings);
     for (let i = 0; i < 3600; i++) {
         S.step(s, 1 / 30);
@@ -119,7 +135,7 @@ test('agents never occupy furniture or move diagonally through it', () => {
 });
 
 test('an empty shop restocks itself and does not spend beyond available funds', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 5;
     s.buildings.forEach((b) => (b.stock = 0));
     run(s, 60);
@@ -129,7 +145,7 @@ test('an empty shop restocks itself and does not spend beyond available funds', 
 });
 
 test('stock changes report the exact units taken and restocked', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     const events = [];
     const record = (shelf, before) => events.push([shelf.type, before, shelf.stock]);
     s.buildings[0].stock = 8;
@@ -142,7 +158,7 @@ test('stock changes report the exact units taken and restocked', () => {
 });
 
 test('building during active routes re-plans without stranding customers', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 4);
     assert.ok(s.customers.length > 0);
     assert.equal(S.place(s, 'flowers', 5, 7).ok, true);
@@ -153,7 +169,7 @@ test('building during active routes re-plans without stranding customers', () =>
 });
 
 test('rotated shelves swap their footprint without losing stock or charging again', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     assert.equal(S.place(s, 'produce', 5, 7, true).ok, true);
     const shelf = s.buildings.at(-1);
     assert.equal(S.shelfAt(s.buildings, 5, 8), shelf);
@@ -171,7 +187,7 @@ test('rotated shelves swap their footprint without losing stock or charging agai
 });
 
 test('removing a shelf redirects a shopper and an employee without refunding the shelf', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     assert.equal(S.place(s, 'produce', 5, 6).ok, true);
     const shelf = s.buildings.at(-1);
     shelf.stock = 1;
@@ -190,7 +206,7 @@ test('removing a shelf redirects a shopper and an employee without refunding the
 });
 
 test('rotation preserves the current movement segment and leads to a valid shelf access', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 2);
     const shopper = s.customers.find((a) => a.request === 'produce');
     const shelf = s.buildings.find((b) => b.id === shopper.target);
@@ -204,7 +220,7 @@ test('rotation preserves the current movement segment and leads to a valid shelf
 });
 
 test('the extension is paid once and adds only the 15 connected floor cells', () => {
-    const s = S.create(), { x, y, cost } = S.EXPANSION;
+    const s = S.create({ empty: false }), { x, y, cost } = S.EXPANSION;
     assert.equal(S.placement(s, 'flowers', x, y).ok, false);
     assert.equal(S.expand(s).ok, false);
     s.money = cost + 480;
@@ -218,7 +234,7 @@ test('the extension is paid once and adds only the 15 connected floor cells', ()
 });
 
 test('placement keeps an entrance open even before the extension has a shelf', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 5000;
     assert.ok(S.expand(s).ok);
     for (let y = 3; y < 7; y++) assert.ok(S.place(s, 'flowers', 10, y).ok);
@@ -226,7 +242,7 @@ test('placement keeps an entrance open even before the extension has a shelf', (
 });
 
 test('moving a stocked shelf into the extension is free and preserves active routes', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 1200;
     assert.ok(S.expand(s).ok);
     run(s, 2);
@@ -244,7 +260,7 @@ test('moving a stocked shelf into the extension is free and preserves active rou
 });
 
 test('the previous day is frozen and the new day reports only its own activity', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     run(s, 185);
     const yesterday = structuredClone(s.lastDay);
     assert.equal(yesterday.day, 1);
@@ -266,7 +282,7 @@ test('the previous day is frozen and the new day reports only its own activity',
 });
 
 test('a new checkout needs a cashier and can move without charging or stranding a customer', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 1500;
     assert.equal(S.placeCounter(s, 3, 3).ok, false);
     assert.ok(S.placeCounter(s, 5, 3).ok);
@@ -292,7 +308,7 @@ test('a new checkout needs a cashier and can move without charging or stranding 
 });
 
 test('reserve hires split restocks and unpaid wages carry forward at day end', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.money = 1800;
     assert.ok(S.placeCounter(s, 5, 3).ok);
     assert.ok(S.hireCashier(s, 3));
@@ -310,7 +326,7 @@ test('reserve hires split restocks and unpaid wages carry forward at day end', (
 });
 
 test('each staffed checkout processes one waiting customer at a time', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     s.spawnTimer = Infinity;
     const shopper = (counter) => ({ ...S.checkoutCell(counter), route: [], request: 'produce',
         state: 'checkout', checkoutId: counter.id, timer: 1, value: S.CATALOG.produce.price, color: 0 });
@@ -321,7 +337,7 @@ test('each staffed checkout processes one waiting customer at a time', () => {
 });
 
 test('customers show their request, a successful checkout or a missed purchase briefly', () => {
-    const s = S.create();
+    const s = S.create({ empty: false });
     const moods = new Set();
     for (let tick = 0; tick < 1200; tick++) {
         S.step(s, 1 / 30);
@@ -332,8 +348,8 @@ test('customers show their request, a successful checkout or a missed purchase b
 });
 
 test('the same fixed steps reproduce the same economy and agents', () => {
-    const a = S.create(),
-        b = S.create();
+    const a = S.create({ empty: false }),
+        b = S.create({ empty: false });
     run(a, 90);
     run(b, 90);
     assert.deepEqual(a, b);

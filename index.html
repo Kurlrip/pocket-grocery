@@ -41,6 +41,7 @@
                     </div>
                 </div>
                 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+                <div id="openingHint" class="demand-hint opening-hint" hidden></div>
                 <button id="demandHint" class="demand-hint" data-panel="construction" aria-haspopup="dialog" hidden>
                     <canvas id="demandArt" aria-hidden="true"></canvas>
                     <span><strong id="demandProduct"></strong><small id="demandCount"></small></span>
@@ -117,7 +118,7 @@
                         <p id="saveStatus" role="status"></p>
                         <button id="restartButton" class="small-button">Nouvelle partie</button>
                         <div id="restartConfirm" hidden>
-                            <p>Effacer la partie sauvegardée et repartir avec un magasin sans rayons et 480 € ?</p>
+                            <p>Effacer la partie sauvegardée et repartir avec un local vide et 480 € ?</p>
                             <button id="restartYes" class="small-button">Recommencer</button>
                             <button id="restartNo" class="small-button">Annuler</button>
                         </div>

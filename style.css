@@ -214,6 +214,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .demand-hint canvas { flex: none; width: 52px; height: 37px; object-fit: contain; }
 .demand-hint strong, .demand-hint small { display: block; }
+.opening-hint { padding: 8px 13px; text-align: center; font-weight: 800; pointer-events: none; }
 .demand-hint small { color: #784629; font-weight: 700; }
 .demand-arrow { margin-inline-start: 4px; font-size: 26px; font-weight: 900; color: #75491f; }
 .toast {

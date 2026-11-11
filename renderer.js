@@ -2,6 +2,7 @@
     'use strict';
     const TILE = 64;
     const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+    const stockHeights = { produce: 75, bakery: 75, dairy: 110, grocery: 95, flowers: 50 };
     // Framing rectangles in the thumbnail canvas, measured with and without the sprite atlas.
     const thumbnailBounds = {
         produce: [[91, 110, 156, 150], [91, 144, 152, 132]],
@@ -282,7 +283,6 @@
             c.restore();
         }
         queueStock(shelf, previous) {
-            if (shelf.type !== 'produce') return;
             const now = performance.now();
             let animation = this.stockAnimations.get(shelf.id);
             if (!animation) {
@@ -298,7 +298,7 @@
             }
             animation.until = start + 1400;
         }
-        drawStockCases(state, inspected, now) {
+        stockPanelShelf(state, inspected, now) {
             let recent = null, latest = 0;
             for (const [id, animation] of this.stockAnimations) {
                 const shelf = state.buildings.find((b) => b.id === id);
@@ -313,18 +313,53 @@
                     latest = animation.until;
                 }
             }
-            const shelf = inspected || recent;
-            if (shelf?.type !== 'produce') {
-                this.stockPanel = null;
-                return false;
-            }
+            return inspected || recent;
+        }
+        stockAnchor(shelf) {
             const { w, h } = Store.sizeOf(shelf);
-            const point = this.p(shelf.x + w / 2, shelf.y + h / 2, 75);
-            const sx = this.origin.x + point.x * this.scale;
-            const sy = this.origin.y + point.y * this.scale;
-            if (sx < 0 || sx > this.width || sy > this.height || sy < -25) return false;
+            const point = this.p(shelf.x + w / 2, shelf.y + h / 2, stockHeights[shelf.type]);
+            const x = this.origin.x + point.x * this.scale;
+            const y = this.origin.y + point.y * this.scale;
+            if (x < 0 || x > this.width || y > this.height || y < -25) return null;
+            return { x, y };
+        }
+        drawStockGauge(shelf, anchor) {
+            const width = 48, height = 12;
+            const left = clamp(anchor.x - width / 2, 5, this.width - width - 5);
+            const top = Math.max(5, anchor.y - height - 9);
+            const capacity = Store.CATALOG[shelf.type].capacity;
+            const visible = this.stockAnimations.get(shelf.id)?.count ?? shelf.stock;
+            const ratio = visible / capacity;
+            const c = this.ctx;
+            c.save();
+            c.translate((left - this.origin.x) / this.scale, (top - this.origin.y) / this.scale);
+            c.scale(1 / this.scale, 1 / this.scale);
+            const tail = clamp(anchor.x - left, 9, width - 9);
+            this.polygon([{ x: tail - 4, y: height - 1 }, { x: tail, y: height + 5 },
+                { x: tail + 4, y: height - 1 }], '#673c26', '#412a20', 1);
+            c.beginPath();
+            c.roundRect(0, 0, width, height, 5);
+            c.fillStyle = '#9a633b';
+            c.fill();
+            c.strokeStyle = '#4d3022';
+            c.lineWidth = 1.2;
+            c.stroke();
+            c.beginPath();
+            c.roundRect(3, 3, width - 6, 6, 3);
+            c.fillStyle = '#583722';
+            c.fill();
+            if (visible > 0) {
+                c.beginPath();
+                c.roundRect(3, 3, (width - 6) * ratio, 6, 3);
+                c.fillStyle = ratio <= 0.25 ? '#fb8a72' : ratio <= 0.5 ? '#f5c064' : '#a6d86d';
+                c.fill();
+            }
+            c.restore();
+        }
+        drawStockCases(shelf, { x: sx, y: sy }, inspected, now) {
+            const product = Store.CATALOG[shelf.type];
 
-            const capacity = Store.CATALOG.produce.capacity;
+            const capacity = product.capacity;
             const cols = 10, cell = 14, padding = 8;
             const width = cols * cell + padding * 2;
             const height = Math.ceil(capacity / cols) * cell + 32;
@@ -340,7 +375,7 @@
             if (this.stockPanel?.id !== shelf.id) this.stockPanel = { id: shelf.id, openedAt: now };
             const reduced = reducedMotion.matches;
             const opening = reduced ? 1 : clamp((now - this.stockPanel.openedAt) / 130, 0, 1);
-            const closing = inspected || reduced ? 1 : clamp((latest - now) / 170, 0, 1);
+            const closing = inspected || reduced ? 1 : clamp((animation.until - now) / 170, 0, 1);
             const openScale = 0.86 + 0.14 * (1 - (1 - opening) ** 2);
             const c = this.ctx;
             c.save();
@@ -370,7 +405,7 @@
             c.fillStyle = '#fff4d7';
             c.font = 'bold 11px sans-serif';
             c.textAlign = 'left';
-            c.fillText('Stock du primeur', padding, 17);
+            c.fillText(product.name, padding, 17);
             c.textAlign = 'right';
             c.fillText(visible + ' / ' + capacity, width - padding, 17);
 
@@ -384,31 +419,59 @@
                 c.strokeStyle = '#e2ae7960';
                 c.lineWidth = 0.75;
                 c.stroke();
-                if (slot < visible && (reduced || slot !== movingSlot)) this.drawStockApple(x + 6, y + 7);
+                if (slot < visible && (reduced || slot !== movingSlot)) this.drawStockItem(shelf.type, x + 6, y + 7);
             }
             if (move && !reduced) {
                 const x = padding + (movingSlot % cols) * cell + 6;
                 const y = 31 + Math.floor(movingSlot / cols) * cell;
                 if (arriving) {
-                    this.drawStockApple(x, y - 9 * (1 - progress) ** 2, 0.72 + 0.28 * progress);
+                    this.drawStockItem(shelf.type, x, y - 9 * (1 - progress) ** 2, 0.72 + 0.28 * progress);
                 } else {
-                    this.drawStockApple(x + 7 * progress, y - 13 * progress,
+                    this.drawStockItem(shelf.type, x + 7 * progress, y - 13 * progress,
                         1 + Math.sin(progress * Math.PI) * 0.22, 1 - progress);
                 }
             }
             c.restore();
-            return true;
         }
-        drawStockApple(x, y, scale = 1, opacity = 1) {
+        drawStockItem(type, x, y, scale = 1, opacity = 1) {
             const c = this.ctx;
             c.save();
             c.translate(x, y);
             c.scale(scale, scale);
             c.globalAlpha *= opacity;
-            this.ellipse(-1.5, 0, 2.9, 3.2, '#d64032');
-            this.ellipse(1.3, 0, 2.8, 3.2, '#f35943');
-            this.ellipse(-1.6, -1, 0.9, 0.7, '#ffb58a');
-            this.ellipse(1.15, -3.3, 1.8, 0.9, '#b4d16f');
+            switch (type) {
+                case 'produce':
+                    this.ellipse(-1.5, 0, 2.9, 3.2, '#d64032');
+                    this.ellipse(1.3, 0, 2.8, 3.2, '#f35943');
+                    this.ellipse(-1.6, -1, 0.9, 0.7, '#ffb58a');
+                    this.ellipse(1.15, -3.3, 1.8, 0.9, '#b4d16f');
+                    break;
+                case 'bakery':
+                    this.ellipse(0, 0, 4.5, 2.9, '#d9913c');
+                    this.line({ x: -2, y: -1.6 }, { x: -0.6, y: 0.2 }, '#ffe3a1', 1);
+                    this.line({ x: 0.5, y: -1.8 }, { x: 1.9, y: 0 }, '#ffe3a1', 1);
+                    break;
+                case 'dairy':
+                    c.fillStyle = '#72bde6';
+                    c.fillRect(-2.7, -2.4, 5.4, 6);
+                    c.fillStyle = '#f6f6db';
+                    c.fillRect(-2, -4, 4, 1.7);
+                    c.fillRect(-1.5, 0, 3, 2);
+                    break;
+                case 'grocery':
+                    c.fillStyle = '#e0a755';
+                    c.fillRect(-3.6, -3.2, 7.2, 6.4);
+                    c.fillStyle = '#ffeead';
+                    c.fillRect(-1.3, -3.2, 2.6, 3);
+                    break;
+                case 'flowers':
+                    for (let petal = 0; petal < 5; petal++) {
+                        const angle = petal * 2 * Math.PI / 5;
+                        this.ellipse(2.2 * Math.cos(angle), 2.2 * Math.sin(angle), 1.55, 1.55, '#ed80aa');
+                    }
+                    this.ellipse(0, 0, 1.45, 1.45, '#ffda67');
+                    break;
+            }
             c.restore();
         }
         counter(x, y) {
@@ -732,29 +795,18 @@
             renderables.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
             this.drawTraffic(state.time);
             this.drawPark();
-            const inspected = editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y));
-            const casesOpen = !draft && this.drawStockCases(state, inspected, now);
-            if (!draft && !editing && inspected && !casesOpen) {
-                const b = inspected;
-                const d = Store.CATALOG[b.type],
-                    { w, h } = Store.sizeOf(b),
-                    p = this.p(b.x + w / 2, b.y + h / 2, 78);
-                c.fillStyle = '#fffdf3';
-                c.shadowColor = '#4c5c3320';
-                c.shadowBlur = 12;
-                c.beginPath();
-                c.roundRect(p.x - 62, p.y - 24, 124, 43, 7);
-                c.fill();
-                c.shadowBlur = 0;
-                this.text(d.name, p.x, p.y - 9, 10, '#3a5b42');
-                this.text(
-                    `${b.stock} / ${d.capacity} en stock · ${d.price} €`,
-                    p.x,
-                    p.y + 5,
-                    8,
-                    '#869476',
-                );
+            const inspected = !draft && (editing || (hover && Store.shelfAt(state.buildings, hover.x, hover.y)));
+            const stockShelf = this.stockPanelShelf(state, inspected, now);
+            if (!draft) {
+                for (const shelf of state.buildings) {
+                    if (shelf === stockShelf) continue;
+                    const anchor = this.stockAnchor(shelf);
+                    if (anchor) this.drawStockGauge(shelf, anchor);
+                }
             }
+            const panelAnchor = !draft && stockShelf && this.stockAnchor(stockShelf);
+            if (panelAnchor) this.drawStockCases(stockShelf, panelAnchor, inspected, now);
+            else this.stockPanel = null;
             c.restore();
         }
         pick(clientX, clientY) {

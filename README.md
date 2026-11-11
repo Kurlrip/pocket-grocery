@@ -17,11 +17,10 @@ python -m http.server 8080
 - Sur téléphone, glisser avec un doigt déplace la vue et pincer avec deux doigts zoome. Le catalogue et les objectifs s’ouvrent depuis le dock.
 - Les clients contournent le mobilier, prennent un article et paient à la caisse.
 - Chaque client cherche un type de produit. Le catalogue indique le stock, les ventes et les demandes manquées par rayon depuis le début de la partie. Une suggestion apparaît quand un produit demandé reste indisponible.
-- Le primeur affiche un casier au-dessus du meuble quand un client prend un article ou quand l’employé le réapprovisionne. Chaque pomme correspond à une unité. Survoler ou sélectionner sa base permet de rouvrir le casier.
+- Chaque rayon a une jauge au-dessus du meuble. Le casier s’ouvre à la même hauteur pendant un achat ou un réassort. Chaque case représente une unité. Survoler ou sélectionner la base du rayon permet aussi de l’ouvrir.
 - L’employé rejoint les rayons sous la moitié de leur capacité, puis retourne à la réserve attenante. Les marchandises sont payées au moment du réassort, dans la limite de la trésorerie.
 - Trois objectifs donnent des primes, chacun une seule fois et dans n'importe quel ordre.
 - La pause et les vitesses ×1, ×2 et ×3 sont en haut à droite. **Commandes** ouvre l’aide. Sur PC, la molette zoome vers le curseur et un glissement avec le bouton gauche déplace la caméra. Espace met le jeu en pause hors boutons et Échap ferme le panneau ouvert ou quitte le placement.
-- Survoler un rayon hors construction pour consulter son stock.
 
 **Pas de sauvegarde pour cette étape : actualiser la page recommence la partie.**
 

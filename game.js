@@ -10,30 +10,57 @@
         last = 0,
         accumulator = 0,
         uiClock = 0,
-        toastTimer = 0,
-        helpWasPaused = false;
+        toastTimer = 0;
     const moneyFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
     const touches = new Map();
     let touchGesture = false;
     const $ = (id) => document.getElementById(id);
+    const panel = $('gamePanel');
+    const panelBody = panel.querySelector('.panel-body');
+    const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier', controls: 'Commandes' };
+    const panelButtons = [...document.querySelectorAll('[data-panel]')];
+    const catalogFeedback = $('catalogFeedback');
+    for (const button of panelButtons) {
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-controls', panel.id);
+        button.addEventListener('click', () => {
+            const name = button.dataset.panel;
+            for (const section of Object.keys(panelTitles)) $(section).hidden = section !== name;
+            $('panelTitle').textContent = panelTitles[name];
+            catalogFeedback.hidden = true;
+            hover = null;
+            button.setAttribute('aria-expanded', 'true');
+            panel.showModal();
+            panelBody.scrollTop = 0;
+        });
+    }
+    $('closePanel').addEventListener('click', () => panel.close());
+    panel.addEventListener('close', () => {
+        for (const button of panelButtons) button.setAttribute('aria-expanded', 'false');
+    });
     function toast(text, error = false) {
         $('toast').textContent = text;
-        $('toast').className = `visible${error ? ' error' : ''}`;
+        $('toast').className = `toast visible${error ? ' error' : ''}`;
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => ($('toast').className = ''), 4000);
+        toastTimer = setTimeout(() => ($('toast').className = 'toast'), 4000);
     }
     for (const [type, d] of Object.entries(Store.CATALOG)) {
         const button = document.createElement('button');
         button.className = 'catalog-card';
         button.dataset.type = type;
         button.setAttribute('aria-pressed', 'false');
-        button.innerHTML = `<span class="number">0${Object.keys(Store.CATALOG).indexOf(type) + 1}</span><canvas aria-hidden="true"></canvas><h3>${d.name}</h3><p>${d.detail}</p><div class="card-price"><span>${d.cost} €</span><span>+${d.price} € / vente</span></div>`;
+        button.innerHTML = `<canvas aria-hidden="true"></canvas><strong>${d.name}</strong><span class="card-detail">${d.detail}</span><span class="card-price"><span>${d.cost} €</span><small>+${d.price} € / vente</small></span>`;
         button.addEventListener('click', () => {
             if (state.money < d.cost) {
-                toast('Quelques ventes de plus et ce rayon sera à vous.', true);
+                catalogFeedback.textContent = `Il manque ${moneyFormat.format(d.cost - state.money)} € pour ce rayon.`;
+                catalogFeedback.hidden = false;
+                catalogFeedback.scrollIntoView({ block: 'nearest' });
                 return;
             }
-            selected = selected === type ? null : type;
+            selected = type;
+            StoreRenderer.thumbnail($('placementArt'), type);
+            panel.close();
+            canvas.focus({ preventScroll: true });
             updateUI();
         });
         $('catalog').appendChild(button);
@@ -45,49 +72,41 @@
             .forEach((button) =>
                 StoreRenderer.thumbnail(button.querySelector('canvas'), button.dataset.type),
             );
-        const facade = $('storefrontCanvas');
-        facade.parentElement.hidden = !StoreSprites.draw(
-            facade.getContext('2d'),
-            'buildings',
-            'storefront',
-            150,
-            196,
-            276,
-        );
+        if (selected) StoreRenderer.thumbnail($('placementArt'), selected);
     });
     function updateUI() {
-        $('money').innerHTML = `${moneyFormat.format(state.money)} <small>€</small>`;
+        $('money').textContent = `${moneyFormat.format(state.money)} €`;
         $('served').textContent = state.served;
-        $('variety').textContent = `${new Set(state.buildings.map((b) => b.type)).size} / 5`;
         $('day').textContent = `JOUR ${String(Math.floor(state.time / 180) + 1).padStart(2, '0')}`;
+        const mission = Store.GOALS.find((_, i) => !state.completed[i]);
+        $('missionTitle').textContent = mission ? mission.text : 'Objectifs terminés';
+        $('missionProgress').textContent = mission ? `${mission.progress(state)} / ${mission.total}` : '✓';
         $('goals').innerHTML = Store.GOALS.map((g, i) => {
             const value = Math.min(g.progress(state), g.total),
                 done = state.completed[i];
-            return `<div class="goal ${done ? 'done' : ''}"><span class="goal-check">${done ? '✓' : `0${i + 1}`}</span><div><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? 'Prime reçue' : `+${g.reward} €`}</b></div></div></div>`;
+            return `<div class="goal"><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track" aria-hidden="true"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? '✓ Prime reçue' : `+${g.reward} €`}</b></div></div>`;
         }).join('');
         document.querySelectorAll('.catalog-card').forEach((b) => {
             b.classList.toggle('selected', b.dataset.type === selected);
             b.classList.toggle('unaffordable', state.money < Store.CATALOG[b.dataset.type].cost);
             b.setAttribute('aria-pressed', String(b.dataset.type === selected));
         });
-        $('cancelButton').classList.toggle('active', !selected);
-        $('selectionHint').textContent = selected
-            ? `${Store.CATALOG[selected].name} · Cliquez sur une case libre.`
-            : 'Choisissez un rayon pour le placer.';
+        $('placement').hidden = !selected;
+        if (selected) {
+            const item = Store.CATALOG[selected];
+            $('placementName').textContent = item.name;
+            $('placementPrice').textContent = `${item.cost} € · Case libre`;
+        }
         canvas.style.cursor = selected ? 'crosshair' : 'default';
         $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';
-        $('pauseButton').textContent = paused ? '▶' : 'Ⅱ';
-        $('pauseButton').setAttribute('aria-label', paused ? 'Reprendre le jeu' : 'Mettre en pause');
+        $('pauseButton').textContent = paused ? '▶ Reprendre' : 'Ⅱ Pause';
         $('pauseButton').setAttribute('aria-pressed', String(paused));
-        $('sceneHint').textContent = paused
-            ? 'Le quartier vous attend. Reprenez quand vous voulez.'
-            : selected
-              ? 'Un aperçu vert ? Le rayon peut s’installer ici.'
-              : 'Votre employé veille au stock. Vous, imaginez la suite.';
     }
     function cancel() {
+        if (!selected) return;
         selected = null;
         updateUI();
+        canvas.focus({ preventScroll: true });
     }
     $('cancelButton').addEventListener('click', cancel);
     $('pauseButton').addEventListener('click', () => {
@@ -173,7 +192,7 @@
         if (e.pointerType !== 'touch' && !touches.size) cancel();
     });
     window.addEventListener('keydown', (e) => {
-        if ($('helpDialog').open) return;
+        if (panel.open) return;
         if (e.key === 'Escape') cancel();
         if (e.code === 'Space' && !['BUTTON', 'INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
             e.preventDefault();
@@ -181,20 +200,9 @@
             updateUI();
         }
     });
-    $('helpButton').addEventListener('click', () => {
-        helpWasPaused = paused;
-        paused = true;
-        updateUI();
-        $('helpDialog').showModal();
-    });
-    $('closeHelp').addEventListener('click', () => $('helpDialog').close());
-    $('startButton').addEventListener('click', () => $('helpDialog').close());
-    $('helpDialog').addEventListener('close', () => {
-        paused = helpWasPaused;
-        updateUI();
-    });
     function drainEvents() {
-        for (const event of state.events) toast(event.text, event.kind === 'error');
+        if (!state.events.length) return;
+        toast(state.events.map((event) => event.text).join(' '), state.events.some((event) => event.kind === 'error'));
         state.events.length = 0;
     }
     function frame(now) {

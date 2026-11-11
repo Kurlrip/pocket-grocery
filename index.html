@@ -2,147 +2,85 @@
 <html lang="fr">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="theme-color" content="#f6f5ee" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#173651" />
         <title>Commerce Town · La petite épicerie</title>
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <header class="topbar">
-            <a class="brand" href="./index.html" aria-label="Commerce Town, accueil"
-                ><span class="brand-mark">ct<span>•</span></span
-                ><span
-                    >commerce<span class="brand-town">town</span
-                    ><small>LES PETITS COMMERCES FONT LES GRANDES HISTOIRES.</small></span
-                ></a
-            >
-            <div class="chapter">
-                <span class="chapter-dot"></span> La petite épicerie
-                <span class="chapter-label">PROTOTYPE JOUABLE</span>
-            </div>
-            <button class="icon-button" id="helpButton" aria-label="Comment jouer" title="Comment jouer">
-                ?
-            </button>
-        </header>
-        <div class="workspace">
-            <aside class="sidebar">
-                <div class="eyebrow">VOTRE COMMERCE, VOTRE HISTOIRE</div>
-                <h1>Bonjour,<br />commerçant<span> !</span></h1>
-                <p class="intro">Un coin de quartier.<br />Une belle aventure à faire grandir.</p>
-                <section class="wallet" aria-label="Trésorerie">
-                    <span class="wallet-icon">€</span><span class="eyebrow">DANS LA CAISSE</span>
-                    <strong id="money">480 <small>€</small></strong
-                    ><span class="wallet-note">Chaque petit commerce commence ici.</span>
-                </section>
-                <div class="metrics">
-                    <div>
-                        <span class="metric-icon">↗</span><strong id="served">0</strong
-                        ><small>clients servis</small>
+        <main class="game">
+            <header class="hud">
+                <h1 class="brand"><span>Commerce</span> <strong>Town</strong></h1>
+                <button class="mission" data-panel="objectives" aria-haspopup="dialog">
+                    <span class="art art-goal" aria-hidden="true">✓</span>
+                    <span class="mission-copy"><small>OBJECTIF</small><strong id="missionTitle"></strong></span>
+                    <span id="missionProgress" class="mission-progress"></span>
+                </button>
+                <div class="counters">
+                    <div class="counter" aria-label="Trésorerie">
+                        <span class="art art-coin" aria-hidden="true">€</span><strong id="money">480 €</strong>
                     </div>
-                    <div>
-                        <span class="metric-icon">♧</span><strong id="variety">4 / 5</strong
-                        ><small>rayons ouverts</small>
+                    <div class="counter" aria-label="Clients servis">
+                        <span class="art art-customers" aria-hidden="true">●●</span><strong id="served">0</strong>
                     </div>
                 </div>
-                <section class="objectives">
-                    <div class="section-title">
-                        <h2>Un pas après l’autre</h2>
-                        <span>✧</span>
-                    </div>
-                    <div id="goals"></div>
-                </section>
-                <div class="sidebar-bottom">
-                    <span class="live-dot"></span
-                    ><span
-                        >Le quartier compte sur vous.<small
-                            >À votre rythme, sans course contre la montre.</small
-                        ></span
-                    >
+            </header>
+
+            <section class="scene" aria-label="La petite épicerie du quartier">
+                <canvas id="gameCanvas" tabindex="0"
+                    aria-label="Magasin. Glissez avec un doigt et pincez pour zoomer. Pour construire, sélectionnez un rayon puis touchez ou cliquez sur une case libre."></canvas>
+                <div class="scene-status"><span id="day"></span><span id="openText"></span></div>
+                <div id="toast" class="toast" role="status" aria-live="polite"></div>
+                <div id="placement" class="placement" hidden>
+                    <canvas id="placementArt" aria-hidden="true"></canvas>
+                    <div><strong id="placementName"></strong><small id="placementPrice"></small></div>
+                    <button id="cancelButton" class="small-button">Annuler</button>
                 </div>
-            </aside>
-            <main>
-                <section class="scene-panel" aria-label="Votre épicerie en vue isométrique">
-                    <div class="scene-heading">
-                        <div>
-                            <div class="eyebrow">LE BONHEUR EST AU COIN DE LA RUE</div>
-                            <h2>La petite épicerie<span> du quartier</span></h2>
-                        </div>
-                        <div class="open-badge">
-                            <span class="live-dot"></span><span id="openText">C’est ouvert !</span>
-                        </div>
-                    </div>
-                    <div class="scene-meta">
-                        <span id="day">JOUR 01</span
-                        ><span class="weather">☀ <span>Une belle journée pour se lancer</span></span>
-                    </div>
-                    <figure class="storefront" hidden>
-                        <canvas id="storefrontCanvas" width="300" height="220" aria-hidden="true"></canvas>
-                        <figcaption>VU DEPUIS LA RUE</figcaption>
-                    </figure>
-                    <canvas
-                        id="gameCanvas"
-                        tabindex="0"
-                        aria-label="Magasin. Sur écran tactile, faites glisser la vue avec un doigt et pincez pour zoomer. Sélectionnez un rayon, puis touchez ou cliquez sur une case libre pour le construire."
-                    ></canvas>
-                    <div class="scene-bottom">
-                        <span class="scene-hint" id="sceneHint"
-                            >Votre épicerie est ouverte. Les premiers clients arrivent.</span
-                        >
-                        <div class="time-controls" aria-label="Vitesse du jeu">
-                            <button id="pauseButton" title="Pause (Espace)" aria-label="Mettre en pause">
-                                Ⅱ</button
-                            ><button data-speed="1" class="active" aria-pressed="true">1×</button
-                            ><button data-speed="2" aria-pressed="false">2×</button
-                            ><button data-speed="4" aria-pressed="false">4×</button>
-                        </div>
-                    </div>
-                    <div id="toast" role="status" aria-live="polite"></div>
-                </section>
-                <section class="build-panel" aria-label="Catalogue de construction">
-                    <div class="build-header">
-                        <div>
-                            <span class="eyebrow">FAITES GRANDIR VOTRE ÉPICERIE</span>
-                            <h2>Il y a de la place pour vos idées.</h2>
-                        </div>
-                        <button id="cancelButton" class="quiet-button">↖ Explorer <kbd>Échap</kbd></button>
-                    </div>
+            </section>
+
+            <nav class="dock" aria-label="Menu du jeu">
+                <button class="dock-button build" data-panel="construction" aria-haspopup="dialog">
+                    <span class="art art-build" aria-hidden="true">▤</span>Construire
+                </button>
+                <button class="dock-button goals" data-panel="objectives" aria-haspopup="dialog">
+                    <span class="art art-goal" aria-hidden="true">✓</span>Objectifs
+                </button>
+                <button class="dock-button settings" data-panel="controls" aria-haspopup="dialog">
+                    <span class="art art-controls" aria-hidden="true">⚙</span>Commandes
+                </button>
+            </nav>
+        </main>
+
+        <dialog id="gamePanel" class="game-panel" aria-labelledby="panelTitle">
+            <header class="panel-header">
+                <h2 id="panelTitle"></h2>
+                <button id="closePanel" class="small-button close" aria-label="Fermer" autofocus>×</button>
+            </header>
+            <div class="panel-body">
+                <section id="construction" hidden>
+                    <p class="panel-note">Premier stock inclus. Le réassort est payé à la livraison.</p>
+                    <p id="catalogFeedback" role="status" class="catalog-feedback" hidden></p>
                     <div id="catalog" class="catalog"></div>
-                    <div class="catalog-note">
-                        <span
-                            >✧ Mobilier fourni avec un premier stock. Réassort automatique, payé à la
-                            livraison.</span
-                        ><span id="selectionHint">Choisissez un rayon pour le placer.</span>
-                    </div>
                 </section>
-            </main>
-        </div>
-        <dialog id="helpDialog">
-            <button class="dialog-close" id="closeHelp" aria-label="Fermer">×</button>
-            <div class="eyebrow">BIENVENUE DANS LE QUARTIER</div>
-            <h2>Une petite épicerie.<br />De grandes idées.</h2>
-            <p>
-                Le magasin est déjà aménagé. Les clients viennent faire leurs courses et règlent leurs achats
-                à la caisse.
-            </p>
-            <ol>
-                <li>
-                    <b>Aménagez.</b> Choisissez un rayon, puis cliquez sur une case libre. L’aperçu vert
-                    confirme que le passage reste accessible.
-                </li>
-                <li>
-                    <b>Laissez vivre.</b> Votre employé réapprovisionne les rayons. Le coût des marchandises
-                    est déduit de la caisse.
-                </li>
-                <li>
-                    <b>Grandissez.</b> Diversifiez l’offre et remplissez les objectifs pour gagner des primes.
-                </li>
-            </ol>
-            <p>Sur écran tactile, faites glisser le magasin avec un doigt et pincez avec deux doigts pour zoomer. Faites défiler la page en dehors du magasin.</p>
-            <p class="help-note">
-                Espace : pause · Échap : quitter la construction · Survolez un rayon pour consulter son
-                stock.<br />Partie locale sans sauvegarde : actualiser recommence le magasin.
-            </p>
-            <button class="primary-button" id="startButton">À moi de jouer →</button>
+                <section id="objectives" hidden><div id="goals"></div></section>
+                <section id="controls" hidden>
+                    <div class="time-controls" aria-label="Vitesse du jeu">
+                        <button id="pauseButton" class="small-button"></button>
+                        <button class="small-button active" data-speed="1" aria-pressed="true">1×</button>
+                        <button class="small-button" data-speed="2" aria-pressed="false">2×</button>
+                        <button class="small-button" data-speed="4" aria-pressed="false">4×</button>
+                    </div>
+                    <details>
+                        <summary>Comment jouer</summary>
+                        <ol>
+                            <li>Dans <b>Construire</b>, choisissez un rayon puis touchez ou cliquez sur une case libre. Gardez les allées accessibles.</li>
+                            <li>Les clients achètent à la caisse. Votre employé réapprovisionne les rayons.</li>
+                            <li>Remplissez les objectifs pour gagner des primes.</li>
+                        </ol>
+                        <p>Glissez avec un doigt pour déplacer la vue et pincez pour zoomer. Sur PC, Espace met le jeu en pause et Échap ferme le panneau ou annule la construction.</p>
+                    </details>
+                </section>
+            </div>
         </dialog>
         <script src="isometric.js"></script>
         <script src="game-core.js"></script>

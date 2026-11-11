@@ -81,6 +81,26 @@ test('new saves preserve the extension, relocated shelves and the previous day',
     assert.equal(resumed.lastDay.day, 1);
 });
 
+test('starting over replaces all shelves and progression with a playable empty shop', () => {
+    const previous = Store.create();
+    previous.money = 1300;
+    assert.ok(Store.expand(previous).ok);
+    assert.ok(Store.place(previous, 'flowers', 10, 4).ok);
+    run(previous, 200);
+    const storage = memory();
+    assert.ok(Save.open(storage).write(previous, 3, true));
+    assert.ok(Save.open(storage).write(Store.create({ empty: true }), 1, false, true));
+    const { state, speed, paused } = Save.open(storage).loaded;
+    assert.deepEqual(state.buildings, []);
+    assert.deepEqual(state, Store.create({ empty: true }));
+    assert.equal(speed, 1);
+    assert.equal(paused, false);
+    assert.ok(Store.place(state, 'produce', 3, 3).ok);
+    assert.equal(state.buildings[0].id, 1);
+    run(state, 45);
+    assert.ok(state.served > 0);
+});
+
 test('invalid route and shelf data are rejected before starting the simulation', () => {
     for (const corrupt of [
         (s) => { s.staff.state = 'refill'; s.staff.target = 999; },

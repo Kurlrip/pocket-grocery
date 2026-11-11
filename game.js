@@ -117,7 +117,7 @@
         $('restartButton').focus();
     });
     $('restartYes').addEventListener('click', () => {
-        if (!save.write(Store.create(), 1, false, true)) {
+        if (!save.write(Store.create({ empty: true }), 1, false, true)) {
             setText($('saveStatus'), saveMessages[save.status]);
             return;
         }

@@ -11,7 +11,7 @@ python -m http.server 8080
 # http://localhost:8080
 ```
 
-- Départ avec 480 €, cinq meubles de vente, deux caisses et un employé de réassort.
+- À la première ouverture, l’épicerie de démonstration commence avec 480 €, cinq meubles de vente, deux caisses et un employé de réassort.
 - Ouvrir **Construire** et choisir un rayon. Sur téléphone, toucher une case pour afficher l’aperçu, puis appuyer sur **Poser**. Sur PC, survoler une case pour prévisualiser et cliquer pour construire. **Tourner** change l’orientation du rayon avant la pose.
 - Hors construction, sélectionner un rayon par sa base pour le déplacer gratuitement en conservant son stock, le tourner sur place ou le retirer. Le retrait est confirmé et ne rembourse pas l’achat.
 - **Construire → Voir l’extension** montre l’aile latérale. Son achat coûte 650 € et ouvre 15 cases supplémentaires.
@@ -24,7 +24,7 @@ python -m http.server 8080
 - Le bouton **Jour** ouvre le bilan en cours et celui du dernier jour terminé. Il compare les ventes, le réassort et les demandes manquées. Pour une ancienne sauvegarde, le premier bilan commence à la reprise.
 - La pause et les vitesses ×1, ×2 et ×3 sont en haut à droite. **Commandes** ouvre l’aide. Sur PC, la molette zoome vers le curseur et un glissement avec le bouton gauche déplace la caméra. Espace met le jeu en pause hors boutons et Échap ferme le panneau ouvert ou quitte le placement.
 
-La partie est sauvegardée automatiquement dans le navigateur. Rouvrir le jeu à la même adresse, sur le même appareil et dans le même navigateur, reprend la simulation, la vitesse et la pause. **Commandes → Nouvelle partie** permet de recommencer après confirmation.
+La partie est sauvegardée automatiquement dans le navigateur. Rouvrir le jeu à la même adresse, sur le même appareil et dans le même navigateur, reprend la simulation, la vitesse et la pause. **Commandes → Nouvelle partie** efface la progression après confirmation et ouvre un magasin sans rayons ni extension, avec 480 €.
 
 ## Vérifier
 

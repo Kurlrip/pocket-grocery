@@ -160,7 +160,7 @@
         }
         return best;
     }
-    function create() {
+    function create({ empty = false } = {}) {
         const state = {
             money: 480,
             served: 0,
@@ -171,10 +171,10 @@
             spawnTimer: 1,
             expanded: false,
             lastDay: null,
-            nextId: 6,
+            nextId: empty ? 1 : 6,
             goal: 0,
             completed: GOALS.map(() => false),
-            buildings: [
+            buildings: empty ? [] : [
                 { id: 1, type: 'produce', x: 3, y: 3, stock: 20 },
                 { id: 2, type: 'bakery', x: 6, y: 5, stock: 18 },
                 { id: 3, type: 'dairy', x: 0, y: 1, stock: CATALOG.dairy.capacity },

@@ -4,10 +4,17 @@
     // Framing rectangles in the thumbnail canvas, measured with and without the sprite atlas.
     const thumbnailBounds = {
         produce: [[91, 110, 156, 150], [91, 144, 152, 132]],
-        bakery: [[87, 93, 156, 168], [91, 142, 153, 136]],
+        bakery: [[87, 103, 156, 158], [91, 142, 153, 136]],
         dairy: [[87, 77, 160, 193], [93, 110, 148, 168]],
         grocery: [[88, 78, 157, 192], [94, 102, 147, 163]],
-        flowers: [[96, 157, 89, 76], [100, 133, 79, 115]],
+        flowers: [[109, 162, 75, 68], [100, 133, 79, 115]],
+    };
+    const hdThumbnailBounds = {
+        produce: [93, 114, 146, 162],
+        bakery: [92, 127, 148, 149],
+        dairy: [95, 75, 143, 202],
+        grocery: [96, 114, 139, 162],
+        flowers: [110, 179, 74, 71],
     };
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const neighborhoodBackdrop = new Image();
@@ -271,6 +278,32 @@
             this.text(text, 0, 4, 5.3, color);
             c.restore();
         }
+        stockMeter(b) {
+            const ratio = clamp(b.stock / Store.CATALOG[b.type].capacity, 0, 1);
+            const { w, h } = Store.sizeOf(b);
+            const p = b.rotated
+                ? this.p(b.x + w, b.y + h * 0.6, 3)
+                : this.p(b.x + w * 0.6, b.y + h, 3);
+            const unit = 1 / this.scale;
+            const width = clamp(25 * this.scale, 19, 39) * unit;
+            const height = clamp(5 * this.scale, 5, 8) * unit;
+            const x = p.x - width / 2, y = p.y - height / 2;
+            const c = this.ctx;
+            c.beginPath();
+            c.roundRect(x, y, width, height, height / 2);
+            c.fillStyle = '#29404a';
+            c.fill();
+            c.lineWidth = unit;
+            c.strokeStyle = ratio === 0 ? '#fa927d' : '#fff2d9';
+            c.stroke();
+            if (ratio > 0) {
+                const fillWidth = Math.max(unit, (width - 2 * unit) * ratio);
+                c.beginPath();
+                c.roundRect(x + unit, y + unit, fillWidth, height - 2 * unit, height / 2);
+                c.fillStyle = ratio <= 0.25 ? '#ff947b' : ratio <= 0.5 ? '#ffc761' : '#a8dc72';
+                c.fill();
+            }
+        }
         counter(x, y) {
             if (
                 this.sprite('furniture', 'counter', x + 1, y + 0.5, 92, {
@@ -497,11 +530,15 @@
                 depth: b.x + b.y + (Store.CATALOG[b.type].size.w + Store.CATALOG[b.type].size.h) / 2,
                 draw: () => this.building(b),
             }));
+            const cashierOffset = StoreSprites.hasHDFurniture('counter') ? 0.35 : 0;
             for (const { x, y } of Store.COUNTERS) {
                 renderables.push({ depth: x + y + 1.5, draw: () => this.counter(x, y) });
                 renderables.push({
                     depth: x + y + 0.25,
-                    draw: () => this.person({ x: x + 0.25, y: y - 1, color: 0 }, state.time, true, true),
+                    draw: () => this.person(
+                        { x: x + 0.25 + cashierOffset, y: y - 1 + cashierOffset, color: 0 },
+                        state.time, true, true,
+                    ),
                 });
             }
             for (const [name, x, y, width] of [
@@ -588,6 +625,7 @@
             renderables.sort((a, b) => a.depth - b.depth).forEach((item) => item.draw());
             this.drawTraffic(state.time);
             this.drawPark();
+            for (const b of state.buildings) this.stockMeter(b);
             if (!draft && !editing && hover) {
                 const b = Store.shelfAt(state.buildings, hover.x, hover.y);
                 if (b) {
@@ -631,7 +669,8 @@
             r.ctx.translate(140, 200);
             r.ctx.scale(1.7, 1.7);
             const illustrated = r.building({ x: 0, y: 0, type }, true);
-            const [left, top, width, height] = thumbnailBounds[type][illustrated ? 0 : 1];
+            const hdBounds = StoreSprites.hasHDFurniture(type) && hdThumbnailBounds[type];
+            const [left, top, width, height] = hdBounds || thumbnailBounds[type][illustrated ? 0 : 1];
             const sw = width + 4, sh = height + 4;
             const dpr = Math.min(devicePixelRatio || 1, 2);
             canvas.width = Math.round(144 * dpr);

@@ -169,7 +169,8 @@
             $('placeButton').disabled = !valid;
         } else if (editing) {
             $('placementName').textContent = Store.CATALOG[editing.type].name;
-            $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} en stock`;
+            const capacity = Store.CATALOG[editing.type].capacity;
+            $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} / ${capacity} en stock`;
         }
         canvas.classList.toggle('placing', !!selected);
         $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';

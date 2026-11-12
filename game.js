@@ -15,6 +15,8 @@
         rotated = false,
         targetTile = null,
         editing = null,
+        moving = null,
+        expanding = false,
         confirmRemoval = false,
         hover = null,
         speed = save.loaded?.speed ?? 1,
@@ -33,7 +35,8 @@
     const $ = (id) => document.getElementById(id);
     const panel = $('gamePanel');
     const panelBody = panel.querySelector('.panel-body');
-    const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier', controls: 'Commandes' };
+    const panelTitles = { construction: 'Construire un rayon', objectives: 'Objectifs du quartier',
+        controls: 'Commandes', report: 'Bilan du magasin', team: 'Équipe' };
     const panelButtons = [...document.querySelectorAll('[data-panel]')];
     const catalogFeedback = $('catalogFeedback');
     const demandHint = $('demandHint');
@@ -84,10 +87,12 @@
             const name = button.dataset.panel;
             for (const section of Object.keys(panelTitles)) $(section).hidden = section !== name;
             $('panelTitle').textContent = panelTitles[name];
+            if (name === 'report') updateReport();
             catalogFeedback.hidden = true;
             hover = null;
             button.setAttribute('aria-expanded', 'true');
-            panel.showModal();
+            if (!panel.open) panel.showModal();
+            else $('closePanel').focus();
             panelBody.scrollTop = 0;
             if (button === demandHint && hintedProduct) {
                 const card = catalogCards.get(hintedProduct).button;
@@ -103,6 +108,7 @@
         $('restartButton').hidden = false;
     });
     $('restartButton').addEventListener('click', () => {
+        setText($('restartPrompt'), `Effacer la partie sauvegardée et repartir avec un local vide et ${Store.STARTING_BUDGET} € ?`);
         $('restartButton').hidden = true;
         $('restartConfirm').hidden = false;
         $('restartNo').focus();
@@ -139,8 +145,9 @@
         button.setAttribute('aria-pressed', 'false');
         button.innerHTML = `<canvas aria-hidden="true"></canvas><strong>${d.name}</strong><span class="card-detail">${d.detail}</span><span class="card-demand"><span class="card-stock"></span><span class="card-sales"></span><span class="card-missed"></span></span><span class="card-price"><span>${d.cost} €</span><small>+${d.price} € / vente</small></span>`;
         button.addEventListener('click', () => {
-            if (state.money < d.cost) {
-                catalogFeedback.textContent = `Il manque ${moneyFormat.format(d.cost - state.money)} € pour ce rayon.`;
+            const reason = Store.purchaseReason(state, d.cost, 'shelf');
+            if (reason) {
+                catalogFeedback.textContent = reason;
                 catalogFeedback.hidden = false;
                 catalogFeedback.scrollIntoView({ block: 'nearest' });
                 return;
@@ -149,6 +156,8 @@
             rotated = false;
             targetTile = null;
             editing = null;
+            moving = null;
+            expanding = false;
             confirmRemoval = false;
             StoreRenderer.thumbnail($('placementArt'), type);
             panel.close();
@@ -186,7 +195,7 @@
             missed.hidden = !demand.missed;
             button.classList.toggle('needs-stock', !units && demand.missed > 0);
             button.classList.toggle('selected', type === selected);
-            button.classList.toggle('unaffordable', state.money < Store.CATALOG[type].cost);
+            button.classList.toggle('unaffordable', !!Store.purchaseReason(state, Store.CATALOG[type].cost, 'shelf'));
             button.setAttribute('aria-pressed', String(type === selected));
             if (!units && demand.missed > (recommendation ? state.demand[recommendation].missed : 0))
                 recommendation = type;
@@ -194,16 +203,50 @@
         if (recommendation !== hintedProduct && recommendation)
             StoreRenderer.thumbnail($('demandArt'), recommendation);
         hintedProduct = recommendation;
-        demandHint.hidden = !hintedProduct || !!selected || !!editing;
+        demandHint.hidden = !hintedProduct || !!selected || !!editing || expanding ||
+            !state.buildings.length || !state.counters.some((b) => b.staffed);
         if (hintedProduct) {
             setText($('demandProduct'), Store.CATALOG[hintedProduct].detail);
             setText($('demandCount'), missedLabel(state.demand[hintedProduct].missed));
         }
     }
+    function updateReport() {
+        const format = (value) => moneyFormat.format(value) + ' €';
+        const reports = [Store.dayReport(state), state.lastDay].filter(Boolean);
+        $('report').innerHTML = reports.map((report, i) => {
+            const rows = report.products.map(({ type, sold, missed }) =>
+                `<tr><th scope="row">${Store.CATALOG[type].detail}</th><td>${sold}</td><td>${format(sold * Store.CATALOG[type].price)}</td><td>${missed}</td></tr>`).join('');
+            return `<section class="goal day-report"><h3>Jour ${report.day} · ${i ? 'Terminé' : 'En cours'}</h3>
+                ${report.partial ? '<p>Ce bilan commence à la reprise de la sauvegarde.</p>' : ''}
+                <p>Ventes <b>${format(report.revenue)}</b> · Réassort <b>${format(report.supplySpent)}</b> · Équipe <b>${format(report.payrollSpent)}</b></p>
+                <p>Solde d’exploitation <b>${format(report.revenue - report.supplySpent - report.payrollSpent)}</b></p>
+                <table><thead><tr><th scope="col">Produit</th><th scope="col">Vendus</th><th scope="col">Recettes</th><th scope="col">Manqués</th></tr></thead><tbody>${rows}</tbody></table></section>`;
+        }).join('');
+    }
+    function validateDraft({ x, y }) {
+        if (selected === 'counter') return Store.counterPlacement(state, x, y, moving?.id);
+        return moving ? Store.movePlacement(state, moving.id, x, y, rotated) :
+            Store.placement(state, selected, x, y, rotated);
+    }
+    const counterSelected = (item) => item && !item.type;
+    function updateTeam() {
+        const team = Store.TEAM;
+        const active = state.counters.filter((b) => b.staffed).length;
+        $('teamSummary').textContent = `${active} / ${state.counters.length} caisses ouvertes · ${Store.workers(state).length} en réserve`;
+        $('teamWages').textContent = `Salaires supplémentaires ${Store.dailyWages(state)} € / jour` +
+            (state.payrollDue ? ` · ${state.payrollDue} € à régler` : '');
+        $('helperDetails').textContent = `Un employé réapprovisionne les rayons pour ${team.helperWage} € / jour.`;
+        $('hireHelperButton').textContent = state.helpers.length >= team.maxHelpers ?
+            'Équipe complète' : `Embaucher un renfort · ${team.helper} €`;
+        const helperReason = Store.purchaseReason(state, team.helper);
+        $('hireHelperButton').disabled = !!helperReason || state.helpers.length >= team.maxHelpers;
+        $('helperDetails').textContent += helperReason ? ` ${helperReason}` : '';
+    }
     function updateUI() {
         $('money').textContent = `${moneyFormat.format(state.money)} €`;
         $('served').textContent = state.served;
-        $('day').textContent = `JOUR ${String(Math.floor(state.time / 180) + 1).padStart(2, '0')}`;
+        $('day').textContent = `JOUR ${String(Store.dayOf(state)).padStart(2, '0')}`;
+        if (panel.open && !$('report').hidden) updateReport();
         const mission = Store.GOALS.find((_, i) => !state.completed[i]);
         $('missionTitle').textContent = mission ? mission.text : 'Objectifs terminés';
         $('missionProgress').textContent = mission ? `${mission.progress(state)} / ${mission.total}` : '✓';
@@ -213,24 +256,56 @@
             return `<div class="goal"><h3>${g.title}</h3><p>${g.text}</p><div class="goal-track" aria-hidden="true"><span style="width:${(value / g.total) * 100}%"></span></div><div class="goal-meta"><span>${value} / ${g.total}</span><b>${done ? '✓ Prime reçue' : `+${g.reward} €`}</b></div></div>`;
         }).join('');
         updateCatalog();
+        updateTeam();
+        const opening = !state.counters.length ? 'Construire → Acheter une caisse' :
+            !state.counters.some((b) => b.staffed) ? 'Sélectionne ta caisse pour embaucher une caissière' :
+                !state.buildings.length ? 'Construire → Choisir un premier rayon' : '';
+        setText($('openingHint'), opening);
+        $('openingHint').hidden = !opening || !!selected || !!editing || expanding;
+        const cashier = counterSelected(editing);
+        $('counterButton').textContent = state.counters.length >= Store.TEAM.maxCounters ?
+            'Nombre maximal de caisses atteint' : `Acheter une caisse · ${Store.TEAM.counter} €`;
+        const counterReason = Store.purchaseReason(state, Store.TEAM.counter, 'counter');
+        $('counterButton').disabled = !!counterReason || state.counters.length >= Store.TEAM.maxCounters;
+        $('counterButton').title = counterReason;
         $('placement').hidden = !selected && !editing;
         $('placeButton').hidden = !selected;
-        $('removeButton').hidden = !editing;
+        $('placeButton').textContent = moving ? 'Déplacer ici' : 'Poser';
+        $('removeButton').hidden = !editing || cashier;
+        $('moveButton').hidden = !editing;
+        $('rotateButton').hidden = selected === 'counter' || cashier;
+        $('hireCashierButton').hidden = !cashier || editing.staffed;
+        $('hireCashierButton').textContent = `Embaucher · ${Store.TEAM.cashier} €`;
+        const cashierReason = Store.purchaseReason(state, Store.TEAM.cashier, 'cashier');
+        $('hireCashierButton').disabled = !!cashierReason;
+        $('hireCashierButton').title = cashierReason;
         $('removeButton').textContent = confirmRemoval ? 'Confirmer' : 'Retirer';
+        $('expansionButton').hidden = state.expanded;
+        $('expansionPreview').hidden = !expanding;
+        const { cost, w, h } = Store.EXPANSION;
+        const expansionReason = Store.purchaseReason(state, cost);
+        $('expansionButton').textContent = `Voir l’extension · ${moneyFormat.format(cost)} €`;
+        $('expansionPrice').textContent = expansionReason ? `${w * h} cases · ${expansionReason}` :
+            `${w * h} cases · ${moneyFormat.format(cost)} €`;
+        $('buyExpansionButton').disabled = !!expansionReason;
         $('rotateButton').setAttribute('aria-pressed', String(selected ? rotated : !!editing?.rotated));
         if (selected) {
-            const item = Store.CATALOG[selected];
-            const valid = targetTile && Store.placement(state, selected, targetTile.x, targetTile.y, rotated).ok;
+            const item = selected === 'counter' ? { name: 'Caisse', cost: Store.TEAM.counter } : Store.CATALOG[selected];
+            const valid = targetTile && validateDraft(targetTile).ok;
             $('placementName').textContent = item.name;
-            $('placementPrice').textContent = `${item.cost} € · ${targetTile ? valid ? 'Prêt à poser' : 'Pose impossible' : 'Choisis une case'}`;
+            const instruction = targetTile ? valid ? 'Emplacement libre' : 'Emplacement impossible' : 'Choisis une case';
+            $('placementPrice').textContent = `${moving ? 'Déplacement gratuit' : item.cost + ' €'} · ${instruction}`;
             $('placeButton').disabled = !valid;
+        } else if (cashier) {
+            $('placementName').textContent = `Caisse ${editing.id}`;
+            $('placementPrice').textContent = editing.staffed ? 'Ouverte' : `Libre · Salaire ${Store.TEAM.cashierWage} € / jour`;
         } else if (editing) {
             $('placementName').textContent = Store.CATALOG[editing.type].name;
             const capacity = Store.CATALOG[editing.type].capacity;
             $('placementPrice').textContent = confirmRemoval ? 'Retrait sans remboursement.' : `${editing.stock} / ${capacity} en stock`;
         }
         canvas.classList.toggle('placing', !!selected);
-        $('openText').textContent = paused ? 'Une petite pause' : 'C’est ouvert !';
+        $('openText').textContent = paused ? 'Une petite pause' : opening ? 'En préparation' : 'C’est ouvert !';
         const pauseButton = $('pauseButton');
         pauseButton.textContent = paused ? '▶' : 'Ⅱ';
         pauseButton.title = paused ? 'Reprendre' : 'Pause';
@@ -238,15 +313,70 @@
         pauseButton.setAttribute('aria-pressed', String(paused));
     }
     function cancel() {
-        if (!selected && !editing) return;
+        if (!selected && !editing && !expanding) return;
         selected = null;
         targetTile = null;
         editing = null;
+        moving = null;
+        expanding = false;
         confirmRemoval = false;
         updateUI();
         canvas.focus({ preventScroll: true });
     }
     $('cancelButton').addEventListener('click', cancel);
+    $('cancelExpansionButton').addEventListener('click', cancel);
+    $('counterButton').addEventListener('click', () => {
+        cancel();
+        selected = 'counter';
+        rotated = false;
+        hover = null;
+        StoreRenderer.thumbnail($('placementArt'), selected);
+        panel.close();
+        updateUI();
+        canvas.focus({ preventScroll: true });
+    });
+    $('hireCashierButton').addEventListener('click', () => {
+        if (counterSelected(editing) && Store.hireCashier(state, editing.id)) {
+            toast('La caisse est ouverte !');
+            checkpoint();
+            updateUI();
+        }
+    });
+    $('hireHelperButton').addEventListener('click', () => {
+        if (!Store.hireHelper(state)) return;
+        checkpoint();
+        updateUI();
+    });
+    $('moveButton').addEventListener('click', () => {
+        if (!editing) return;
+        moving = editing;
+        selected = editing.type || 'counter';
+        rotated = !!editing.rotated;
+        targetTile = null;
+        editing = null;
+        hover = null;
+        confirmRemoval = false;
+        updateUI();
+        canvas.focus({ preventScroll: true });
+    });
+    $('expansionButton').addEventListener('click', () => {
+        cancel();
+        expanding = true;
+        hover = null;
+        panel.close();
+        updateUI();
+        canvas.focus({ preventScroll: true });
+    });
+    $('buyExpansionButton').addEventListener('click', () => {
+        if (!expanding) return;
+        const result = Store.expand(state);
+        if (!result.ok) toast(result.reason, true);
+        else {
+            cancel();
+            drainEvents();
+            checkpoint();
+        }
+    });
     $('placeButton').addEventListener('click', () => {
         if (selected && targetTile) placeSelected();
     });
@@ -298,9 +428,13 @@
         });
     }
     function placeSelected() {
-        const result = Store.place(state, selected, targetTile.x, targetTile.y, rotated);
+        const { x, y } = targetTile;
+        const result = selected === 'counter' ? Store.placeCounter(state, x, y, moving?.id) :
+            moving ? Store.moveShelf(state, moving.id, x, y, rotated) : Store.place(state, selected, x, y, rotated);
         if (!result.ok) toast(result.reason, true);
         else {
+            if (moving) toast(selected === 'counter' ? 'Caisse déplacée.' : 'Rayon déplacé.');
+            else if (selected === 'counter') toast('Caisse installée. Sélectionnez-la pour embaucher une caissière.');
             cancel();
             drainEvents();
             checkpoint();
@@ -308,25 +442,27 @@
         updateUI();
     }
     function activateTile(x, y, touch = false) {
+        if (expanding) return;
         const tile = renderer.pick(x, y);
         if (selected) {
             targetTile = tile;
             if (touch) {
-                const result = Store.placement(state, selected, tile.x, tile.y, rotated);
+                const result = validateDraft(tile);
                 if (!result.ok) toast(result.reason, true);
                 else clearError();
                 updateUI();
             } else placeSelected();
             return;
         }
-        const shelf = Store.shelfAt(state.buildings, tile.x, tile.y);
+        const shelf = Store.shelfAt(state.buildings, tile.x, tile.y) ||
+            state.counters.find((b) => tile.y === b.y && (tile.x === b.x || tile.x === b.x + 1));
         if (!shelf) {
             cancel();
             return;
         }
         editing = shelf;
         confirmRemoval = false;
-        StoreRenderer.thumbnail($('placementArt'), shelf.type);
+        StoreRenderer.thumbnail($('placementArt'), shelf.type || 'counter');
         updateUI();
     }
     const point = (e) => ({ x: e.clientX, y: e.clientY });
@@ -455,7 +591,7 @@
             }
         }
         if (now - lastSave >= 3000) saveNow();
-        renderer.render(state, hover || targetTile, selected && { type: selected, rotated }, editing, now);
+        renderer.render(state, hover || targetTile, selected && { type: selected, rotated, id: moving?.id }, editing, now, expanding);
         requestAnimationFrame(frame);
     }
     setText($('saveStatus'), saveMessages[save.status]);

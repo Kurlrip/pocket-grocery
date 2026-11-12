@@ -15,10 +15,26 @@ test('a new shop opens from an empty room within the starting budget', () => {
     assert.ok(S.placeCounter(s, 1, 7).ok);
     assert.ok(S.hireCashier(s, 1));
     assert.ok(S.place(s, 'produce', 3, 3).ok);
-    assert.equal(s.money, 75);
-    assert.equal(S.dailyWages(s), S.TEAM.cashierWage);
+    assert.ok(S.hireHelper(s));
+    assert.equal(s.money, 80);
+    assert.equal(S.dailyWages(s), S.TEAM.cashierWage + S.TEAM.helperWage);
     run(s, 45);
     assert.ok(s.served > 0);
+});
+
+test('optional purchases cannot consume the opening budget before the first sale', () => {
+    const s = S.create();
+    assert.match(S.placement(s, 'grocery', 3, 3).reason, /Gardez 285/);
+    assert.ok(S.hireHelper(s));
+    assert.ok(S.placeCounter(s, 1, 7).ok);
+    assert.equal(S.placeCounter(s, 6, 8).ok, false);
+    assert.ok(S.hireCashier(s, 1));
+    s.time = S.DAY_LENGTH - 0.01;
+    S.step(s, 1 / 30);
+    assert.equal(s.money, 200);
+    assert.equal(s.payrollDue, 0);
+    assert.ok(S.place(s, 'bakery', 3, 3).ok);
+    assert.equal(s.money, 20);
 });
 
 test('routes use cardinal, walkable cells and avoid the initial furniture', () => {
@@ -318,6 +334,7 @@ test('reserve hires split restocks and unpaid wages carry forward at day end', (
     assert.deepEqual(S.workers(s).map((worker) => worker.target), [1, 2]);
     const fees = s.payrollSpent;
     s.money = 20;
+    s.served = 1;
     s.time = S.DAY_LENGTH - 0.01;
     S.step(s, 1 / 30);
     assert.equal(s.money, 0);

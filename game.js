@@ -108,6 +108,7 @@
         $('restartButton').hidden = false;
     });
     $('restartButton').addEventListener('click', () => {
+        setText($('restartPrompt'), `Effacer la partie sauvegardée et repartir avec un local vide et ${Store.STARTING_BUDGET} € ?`);
         $('restartButton').hidden = true;
         $('restartConfirm').hidden = false;
         $('restartNo').focus();
@@ -144,8 +145,9 @@
         button.setAttribute('aria-pressed', 'false');
         button.innerHTML = `<canvas aria-hidden="true"></canvas><strong>${d.name}</strong><span class="card-detail">${d.detail}</span><span class="card-demand"><span class="card-stock"></span><span class="card-sales"></span><span class="card-missed"></span></span><span class="card-price"><span>${d.cost} €</span><small>+${d.price} € / vente</small></span>`;
         button.addEventListener('click', () => {
-            if (state.money < d.cost) {
-                catalogFeedback.textContent = `Il manque ${moneyFormat.format(d.cost - state.money)} € pour ce rayon.`;
+            const reason = Store.purchaseReason(state, d.cost, 'shelf');
+            if (reason) {
+                catalogFeedback.textContent = reason;
                 catalogFeedback.hidden = false;
                 catalogFeedback.scrollIntoView({ block: 'nearest' });
                 return;
@@ -193,7 +195,7 @@
             missed.hidden = !demand.missed;
             button.classList.toggle('needs-stock', !units && demand.missed > 0);
             button.classList.toggle('selected', type === selected);
-            button.classList.toggle('unaffordable', state.money < Store.CATALOG[type].cost);
+            button.classList.toggle('unaffordable', !!Store.purchaseReason(state, Store.CATALOG[type].cost, 'shelf'));
             button.setAttribute('aria-pressed', String(type === selected));
             if (!units && demand.missed > (recommendation ? state.demand[recommendation].missed : 0))
                 recommendation = type;
@@ -236,7 +238,9 @@
         $('helperDetails').textContent = `Un employé réapprovisionne les rayons pour ${team.helperWage} € / jour.`;
         $('hireHelperButton').textContent = state.helpers.length >= team.maxHelpers ?
             'Équipe complète' : `Embaucher un renfort · ${team.helper} €`;
-        $('hireHelperButton').disabled = state.money < team.helper || state.helpers.length >= team.maxHelpers;
+        const helperReason = Store.purchaseReason(state, team.helper);
+        $('hireHelperButton').disabled = !!helperReason || state.helpers.length >= team.maxHelpers;
+        $('helperDetails').textContent += helperReason ? ` ${helperReason}` : '';
     }
     function updateUI() {
         $('money').textContent = `${moneyFormat.format(state.money)} €`;
@@ -261,7 +265,9 @@
         const cashier = counterSelected(editing);
         $('counterButton').textContent = state.counters.length >= Store.TEAM.maxCounters ?
             'Nombre maximal de caisses atteint' : `Acheter une caisse · ${Store.TEAM.counter} €`;
-        $('counterButton').disabled = state.money < Store.TEAM.counter || state.counters.length >= Store.TEAM.maxCounters;
+        const counterReason = Store.purchaseReason(state, Store.TEAM.counter, 'counter');
+        $('counterButton').disabled = !!counterReason || state.counters.length >= Store.TEAM.maxCounters;
+        $('counterButton').title = counterReason;
         $('placement').hidden = !selected && !editing;
         $('placeButton').hidden = !selected;
         $('placeButton').textContent = moving ? 'Déplacer ici' : 'Poser';
@@ -270,16 +276,18 @@
         $('rotateButton').hidden = selected === 'counter' || cashier;
         $('hireCashierButton').hidden = !cashier || editing.staffed;
         $('hireCashierButton').textContent = `Embaucher · ${Store.TEAM.cashier} €`;
-        $('hireCashierButton').disabled = state.money < Store.TEAM.cashier;
+        const cashierReason = Store.purchaseReason(state, Store.TEAM.cashier, 'cashier');
+        $('hireCashierButton').disabled = !!cashierReason;
+        $('hireCashierButton').title = cashierReason;
         $('removeButton').textContent = confirmRemoval ? 'Confirmer' : 'Retirer';
         $('expansionButton').hidden = state.expanded;
         $('expansionPreview').hidden = !expanding;
         const { cost, w, h } = Store.EXPANSION;
-        const missing = Math.max(0, cost - state.money);
+        const expansionReason = Store.purchaseReason(state, cost);
         $('expansionButton').textContent = `Voir l’extension · ${moneyFormat.format(cost)} €`;
-        $('expansionPrice').textContent = missing ? `${w * h} cases · Il manque ${moneyFormat.format(missing)} €` :
+        $('expansionPrice').textContent = expansionReason ? `${w * h} cases · ${expansionReason}` :
             `${w * h} cases · ${moneyFormat.format(cost)} €`;
-        $('buyExpansionButton').disabled = !!missing;
+        $('buyExpansionButton').disabled = !!expansionReason;
         $('rotateButton').setAttribute('aria-pressed', String(selected ? rotated : !!editing?.rotated));
         if (selected) {
             const item = selected === 'counter' ? { name: 'Caisse', cost: Store.TEAM.counter } : Store.CATALOG[selected];

@@ -4,6 +4,7 @@
     const EXPANSION = { x: SIZE, y: 3, w: 3, h: 5, cost: 650 };
     const WIDTH = SIZE + EXPANSION.w;
     const DAY_LENGTH = 180;
+    const STARTING_BUDGET = 625;
     const ENTRANCE = { x: 4, y: 9 };
     const COUNTERS = [
         { x: 1, y: 7 },
@@ -71,6 +72,7 @@
         },
     };
     const productTypes = Object.keys(CATALOG);
+    const cheapestShelf = Math.min(...productTypes.map((type) => CATALOG[type].cost));
     const GOALS = [
         {
             title: 'Les premiers habitués',
@@ -170,7 +172,7 @@
     }
     function create({ empty = true } = {}) {
         const state = {
-            money: 480,
+            money: empty ? STARTING_BUDGET : 480,
             served: 0,
             revenue: 0,
             supplySpent: 0,
@@ -234,12 +236,20 @@
         s.events.push({ text, kind });
         if (s.events.length > 8) s.events.shift();
     }
+    function purchaseReason(s, cost, adding) {
+        if (s.money < cost) return `Il manque ${cost - s.money} € pour cet achat.`;
+        let reserve = 0;
+        if (!s.counters.length && adding !== 'counter') reserve += TEAM.counter;
+        if (!s.counters.some((b) => b.staffed) && adding !== 'cashier') reserve += TEAM.cashier;
+        if (!s.buildings.length && adding !== 'shelf') reserve += cheapestShelf;
+        return s.money - cost < reserve ? `Gardez ${reserve} € pour ouvrir une caisse et un premier rayon.` : '';
+    }
     function placement(s, type, x, y, rotated = false) {
         const config = CATALOG[type];
         if (!config || !Number.isInteger(x) || !Number.isInteger(y))
             return { ok: false, reason: 'Choisissez une case dans le magasin.' };
-        if (s.money < config.cost)
-            return { ok: false, reason: 'Quelques ventes de plus et ce rayon sera à vous.' };
+        const reason = purchaseReason(s, config.cost, 'shelf');
+        if (reason) return { ok: false, reason };
         return validateLayout(s, { id: s.nextId, type, x, y, ...(rotated && { rotated: true }) });
     }
     function headedToShelf(agent, id) {
@@ -350,8 +360,12 @@
     function counterPlacement(s, x, y, id) {
         const current = s.counters.find((b) => b.id === id);
         if (id && !current) return { ok: false, reason: 'Cette caisse est introuvable.' };
-        if (!current && (s.counters.length >= TEAM.maxCounters || s.money < TEAM.counter))
-            return { ok: false, reason: 'Vous ne pouvez pas acheter une caisse supplémentaire.' };
+        if (!current) {
+            if (s.counters.length >= TEAM.maxCounters)
+                return { ok: false, reason: 'Nombre maximal de caisses atteint.' };
+            const reason = purchaseReason(s, TEAM.counter, 'counter');
+            if (reason) return { ok: false, reason };
+        }
         const candidate = { id: id ?? s.counters.length + 1, x, y, staffed: current?.staffed ?? false,
             included: current?.included ?? false };
         const others = s.counters.filter((b) => b !== current);
@@ -403,14 +417,14 @@
     }
     function hireCashier(s, id) {
         const counter = s.counters.find((b) => b.id === id);
-        if (!counter || counter.staffed || s.money < TEAM.cashier) return false;
+        if (!counter || counter.staffed || purchaseReason(s, TEAM.cashier, 'cashier')) return false;
         counter.staffed = true;
         s.money -= TEAM.cashier;
         s.payrollSpent += TEAM.cashier;
         return true;
     }
     function hireHelper(s) {
-        if (s.helpers.length >= TEAM.maxHelpers || s.money < TEAM.helper) return false;
+        if (s.helpers.length >= TEAM.maxHelpers || purchaseReason(s, TEAM.helper)) return false;
         s.helpers.push(newWorker());
         s.money -= TEAM.helper;
         s.payrollSpent += TEAM.helper;
@@ -422,7 +436,8 @@
     }
     function expand(s) {
         if (s.expanded) return { ok: false, reason: 'L’extension est déjà ouverte.' };
-        if (s.money < EXPANSION.cost) return { ok: false, reason: 'La caisse ne couvre pas encore le prix de l’extension.' };
+        const reason = purchaseReason(s, EXPANSION.cost);
+        if (reason) return { ok: false, reason };
         s.money -= EXPANSION.cost;
         s.expanded = true;
         updateRoutes(s, gridFor(s.buildings, true, s.counters));
@@ -603,7 +618,7 @@
         }
         checkGoals(s);
         if (dayOf(s) !== day) {
-            s.payrollDue += dailyWages(s);
+            if (s.served > 0) s.payrollDue += dailyWages(s);
             const paid = Math.min(s.money, s.payrollDue);
             s.payrollDue -= paid;
             s.money -= paid;
@@ -616,6 +631,7 @@
         SIZE,
         WIDTH,
         DAY_LENGTH,
+        STARTING_BUDGET,
         EXPANSION,
         ENTRANCE,
         CHECKOUT,
@@ -641,6 +657,7 @@
         hireCashier,
         hireHelper,
         dailyWages,
+        purchaseReason,
         checkoutCell,
         counterTiles,
         startingCounters,
